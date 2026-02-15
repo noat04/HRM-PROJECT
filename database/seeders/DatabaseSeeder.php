@@ -13,11 +13,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // 1. Tạo 10 user ngẫu nhiên (tên, email random)
+        User::factory(10)->create();
 
+        // 2. Tạo 1 user cụ thể để bạn đăng nhập test (Email cố định)
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'password' => bcrypt('password'), // Mật khẩu là "password"
         ]);
     }
 }
