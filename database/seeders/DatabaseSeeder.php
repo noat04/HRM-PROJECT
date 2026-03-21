@@ -13,14 +13,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Tạo 10 user ngẫu nhiên (tên, email random)
-        User::factory(10)->create();
+        // // 1. Tạo 10 user ngẫu nhiên (tên, email random)
+        // User::factory(10)->create();
 
-        // 2. Tạo 1 user cụ thể để bạn đăng nhập test (Email cố định)
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => bcrypt('password'), // Mật khẩu là "password"
+    //   Schema::create('users', function (Blueprint $table) {
+    //         $table->id();
+    //         $table->string('name');
+    //         $table->string('email')->unique();
+    //         $table->timestamp('email_verified_at')->nullable();
+    //         $table->string('password');
+            
+    //         // 👇 THÊM ĐÚNG DÒNG NÀY VÀO ĐÂY LÀ XONG
+    //         $table->boolean('is_active')->default(true); 
+            
+    //         $table->rememberToken();
+    //         $table->timestamps();
+    //     });
+        $this->call([
+            RolesAndPermissionsSeeder::class,
+            MasterDataSeeder::class,
+            UserAndEmployeeSeeder::class,
         ]);
     }
 }
