@@ -4,24 +4,34 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
+import { Checkbox } from '@/components/ui/checkbox'; // 👇 Import Checkbox
+import { Label } from '@/components/ui/label';       // 👇 Import Label
 import { ArrowLeft } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 import { ref } from 'vue';
-//Nhận dữ liệu từ controller
+
+// Nhận dữ liệu từ controller
+interface Role {
+    id: number;
+    name: string;
+    display_name: string;
+}
+
 interface User {
     id: number;
     name: string;
     email: string;
-    password: string;
-    avatar: string ;
+    avatar: string | null;
     status: string;
+    role_ids: number[]; // 👇 Thêm mảng ID vai trò
     created_at: EpochTimeStamp;
     updated_at: EpochTimeStamp;
-    deleted_at: EpochTimeStamp;
+    deleted_at?: EpochTimeStamp;
 }
 
 const props = defineProps<{
     user: User;
+    roles: Role[]; // 👇 Nhận danh sách vai trò từ backend
     processing?: boolean;
 }>();
 
@@ -30,9 +40,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Chỉnh sửa', href: `/users/${props.user.id}/edit` },
 ];
 
-
 // 1. Tạo biến hiển thị ảnh xem trước
-// Nếu user có ảnh cũ thì nối với thư mục storage, nếu không thì dùng ảnh mặc định
 const avatarPreview = ref(
     props.user.avatar 
     ? `/storage/${props.user.avatar}` 
@@ -43,21 +51,22 @@ const avatarPreview = ref(
 const form = useForm({
     name: props.user.name,
     email: props.user.email,
-    password: props.user.password,
-    avatar: null as File | null, // Ban đầu để null, chỉ chứa dữ liệu khi người dùng up ảnh MỚI
+    password: '', // 👇 Để trống, không lấy password cũ lên
+    avatar: null as File | null,
     status: props.user.status,
-     created_at: props.user.created_at,
-    updated_at: props.user.updated_at,
-    deleted_at: props.user.deleted_at,
+    role_ids: props.user.role_ids || [], // 👇 Load sẵn các quyền user đang có
     
-    // 👇 TUYỆT CHIÊU CỦA LARAVEL: Ép dùng PUT qua đường POST để gửi được File
+    // TUYỆT CHIÊU CỦA LARAVEL: Ép dùng PUT qua đường POST để gửi được File
     _method: 'PUT', 
 });
 
-// 3. Hàm xử lý submit (Đổi thành POST)
+// 3. Hàm xử lý submit
 const submitForm = () => {
-    // Phải dùng POST vì Inertia/Laravel không nhận file qua PUT trực tiếp
-    form.post(`/users/${props.user.id}`);
+    // Dùng transform để ép mảng proxy thành array thuần cho role_ids
+    form.transform((data) => ({
+        ...data,
+        role_ids: Array.from(data.role_ids)
+    })).post(`/users/${props.user.id}`);
 };
 
 // 4. Hàm xử lý chọn ảnh mới
@@ -65,16 +74,25 @@ const handleAvatarChange = (event: Event) => {
     const target = event.target as HTMLInputElement;
     if (target && target.files && target.files.length > 0) {
         const file = target.files[0];
-        form.avatar = file; // Đưa file vào form để chuẩn bị gửi đi
-        
-        // Tạo một đường dẫn ảo (tạm thời) trên trình duyệt để hiện ảnh ngay lập tức
+        form.avatar = file; 
         avatarPreview.value = URL.createObjectURL(file);
     } else {
-        // Nếu người dùng ấn "Hủy" chọn file, trả về ảnh cũ
         form.avatar = null;
         avatarPreview.value = props.user.avatar 
             ? `/storage/${props.user.avatar}` 
             : `https://ui-avatars.com/api/?name=${props.user.name}&background=random`;
+    }
+};
+
+// 5. Hàm xử lý checkbox quyền
+const handleRoleChange = (checked: boolean, id: number) => {
+    const numId = Number(id);
+    if (checked) {
+        if (!form.role_ids.includes(numId)) {
+            form.role_ids = [...form.role_ids, numId];
+        }
+    } else {
+        form.role_ids = form.role_ids.filter(rId => rId !== numId);
     }
 };
 </script>
@@ -99,8 +117,9 @@ const handleAvatarChange = (event: Event) => {
             <Card>
                 <CardContent class="pt-6">
                     <form @submit.prevent="submitForm" class="space-y-6">
+                        
                         <div class="space-y-2">
-                            <label class="text-sm font-medium">Tên Người dùng</label>
+                            <Label class="text-sm font-medium">Tên Người dùng <span class="text-destructive">*</span></Label>
                             <input 
                                 v-model="form.name" 
                                 type="text" 
@@ -111,7 +130,7 @@ const handleAvatarChange = (event: Event) => {
                         </div>
 
                         <div class="space-y-2">
-                            <label class="text-sm font-medium">Email</label>
+                            <Label class="text-sm font-medium">Email <span class="text-destructive">*</span></Label>
                             <input 
                                 v-model="form.email" 
                                 type="email" 
@@ -122,45 +141,65 @@ const handleAvatarChange = (event: Event) => {
                         </div>
 
                         <div class="space-y-2">
-                            <label class="text-sm font-medium">Mật khẩu</label>
+                            <Label class="text-sm font-medium">Mật khẩu</Label>
                             <input 
                                 v-model="form.password" 
                                 type="password" 
+                                placeholder="Để trống nếu không muốn thay đổi mật khẩu"
                                 class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
                             />
                             <p v-if="form.errors.password" class="text-sm text-destructive">{{ form.errors.password }}</p>
                         </div>
 
-                       <div class="space-y-2">
-                            <label class="text-sm font-medium">Ảnh đại diện</label>
-    
+                        <div class="space-y-2">
+                            <Label class="text-sm font-medium">Ảnh đại diện</Label>
                             <div class="flex items-center gap-6 mt-2">
                                 <div class="shrink-0">
                                     <img 
                                         :src="avatarPreview" 
-                                alt="Avatar" 
-                                class="w-20 h-20 rounded-full object-cover border border-gray-200 shadow-sm"
-                            />
+                                        alt="Avatar" 
+                                        class="w-20 h-20 rounded-full object-cover border border-gray-200 shadow-sm"
+                                    />
+                                </div>
+                                <div class="flex-1 space-y-2">
+                                    <input 
+                                        type="file" 
+                                        @change="handleAvatarChange" 
+                                        accept="image/*"
+                                        class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm cursor-pointer file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                                    />
+                                    <p class="text-xs text-muted-foreground">
+                                        Định dạng JPG, PNG hoặc GIF. Tối đa 2MB. Để trống nếu không muốn thay đổi.
+                                    </p>
+                                </div>
+                            </div>
+                            <p v-if="form.errors.avatar" class="text-sm text-destructive">{{ form.errors.avatar }}</p>
                         </div>
-        
-        <div class="flex-1 space-y-2">
-            <input 
-                type="file" 
-                @change="handleAvatarChange" 
-                accept="image/*"
-                class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm cursor-pointer file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
-            />
-            <p class="text-xs text-muted-foreground">
-                Định dạng JPG, PNG hoặc GIF. Tối đa 2MB. Để trống nếu không muốn thay đổi.
-            </p>
-        </div>
-    </div>
-    
-    <p v-if="form.errors.avatar" class="text-sm text-destructive">{{ form.errors.avatar }}</p>
-</div>
 
-                        <div class="space-y-2">
-                            <label class="text-sm font-medium">Trạng thái</label>
+                        <div class="space-y-3 pt-4 border-t mt-6">
+                            <Label class="text-sm font-medium text-lg">Vai trò (Chức danh)</Label>
+                            <p class="text-sm text-muted-foreground mb-4">Sửa đổi các chức danh và quyền hạn của người dùng này.</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border rounded-md p-4 bg-gray-50/50">
+                                <div v-for="role in (roles || [])" :key="role.id" class="flex items-center space-x-2">
+                                    <Checkbox
+    :id="`role-${role.id}`"
+    :modelValue="form.role_ids.includes(Number(role.id))"
+    @update:modelValue="(val: boolean | 'indeterminate') => handleRoleChange(val === true, role.id)"
+/>
+                                    <Label :for="`role-${role.id}`" class="text-sm font-medium leading-none cursor-pointer">
+                                        {{ role.display_name || role.name }}
+                                    </Label>
+                                </div>
+                                <div v-if="!roles || roles.length === 0" class="text-sm text-gray-500 italic col-span-full">
+                                    Chưa có vai trò nào trong hệ thống.
+                                </div>
+                            </div>
+                            <p v-if="form.errors.role_ids" class="text-sm text-destructive">{{ form.errors.role_ids }}</p>
+                        </div>
+
+                        <div class="space-y-2 pt-4 border-t">
+                            <Label class="text-sm font-medium">Trạng thái</Label>
                             <select 
                                 v-model="form.status" 
                                 class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
@@ -182,6 +221,9 @@ const handleAvatarChange = (event: Event) => {
                         </div>
                     </form>
                 </CardContent>
+                    <div class="bg-black text-green-400 p-2 rounded mt-2">
+                        {{ form.role_ids }}
+                    </div>
             </Card>
         </div>
     </AppLayout>

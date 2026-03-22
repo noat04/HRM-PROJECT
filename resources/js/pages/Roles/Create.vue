@@ -67,8 +67,16 @@ const submitForm = () => {
                 <div>
                     <label class="block text-sm font-medium mb-2">Quyền hạn</label>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        <label v-for="perm in permissions" :key="perm.id" class="flex items-center gap-2">
-                            <input type="checkbox" :value="perm.id" v-model="form.permission_ids" />
+                        <label
+                            v-for="perm in permissions"
+                            :key="perm.id"
+                            class="flex items-center gap-2"
+                        >
+                            <input
+                                type="checkbox"
+                                :value="Number(perm.id)"
+                                v-model="form.permission_ids"
+                            />
                             {{ perm.name }}
                         </label>
                     </div>

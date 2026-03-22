@@ -25,9 +25,9 @@ const form = useForm({
     name: props.role.name,
     display_name: props.role.display_name,
     description: props.role.description,
-    permission_ids: props.role.permissions,
+    // Đảm bảo luôn là mảng (Array)
+    permission_ids: props.role.permissions || [], 
 });
-
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Vai trò', href: '/roles' },
@@ -35,18 +35,19 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Chỉnh sửa', href: `/roles/${props.role.id}/edit` },
 ];
 
-const togglePermission = (id: number) => {
-    if (form.permission_ids.includes(id)) {
-        // Nếu đã có -> Xóa đi bằng hàm filter (Lọc giữ lại những ID khác)
-        form.permission_ids = form.permission_ids.filter(pId => pId !== id);
-    } else {
-        // Nếu chưa có -> Tạo mảng mới bao gồm mảng cũ và thêm ID mới vào cuối
-        form.permission_ids = [...form.permission_ids, id];
-    }
-};
+const handleCheckboxChange = (checked: boolean, id: number) => {
+    const numId = Number(id);
 
+    form.permission_ids = checked
+        ? [...new Set([...form.permission_ids, numId])]
+        : form.permission_ids.filter(pId => pId !== numId);
+};
 const submit = () => {
-    form.put(`/roles/${props.role.id}`, {
+    form.transform((data) => ({
+        ...data,
+        // Ép dữ liệu permission_ids thành mảng thuần túy (loại bỏ proxy của Vue)
+        permission_ids: Array.from(data.permission_ids)
+    })).put(`/roles/${props.role.id}`, {
         preserveScroll: true,
     });
 };
@@ -102,8 +103,8 @@ const submit = () => {
                             <div v-for="perm in permissions" :key="perm.id" class="flex items-center space-x-2">
                                 <Checkbox
                                     :id="`perm-${perm.id}`"
-                                    :checked="form.permission_ids.includes(perm.id)"
-                                    @update:checked="togglePermission(perm.id)"
+                                    :modelValue="form.permission_ids.includes(Number(perm.id))"
+                                    @update:modelValue="(val: boolean | 'indeterminate') => handleCheckboxChange(val === true, perm.id)"
                                 />
                                 <Label :for="`perm-${perm.id}`" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                                     {{ perm.name }}
@@ -112,6 +113,11 @@ const submit = () => {
                         </div>
                     </CardContent>
                 </Card>
+
+                <div class="p-4 mt-4 bg-gray-900 text-green-400 rounded text-sm font-mono">
+                    <p>Dữ liệu chuẩn bị gửi lên Server:</p>
+                    {{ form.permission_ids }}
+                </div>
 
                 <div class="flex justify-end gap-2">
                     <Link href="/roles">
