@@ -5,7 +5,6 @@ import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
 import { Pencil, Trash2, Eye, Plus, Search } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
