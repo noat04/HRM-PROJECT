@@ -18,13 +18,14 @@ Route::get('dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    // Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    // ... các route profile khác ...
+    Route::put('users/{user}/status', [UserController::class, 'updateStatus'])->name('users.status');
+    Route::put('users/{id}/restore', [UserController::class, 'restore'])->name('users.restore');
 
-   Route::resource('departments', DepartmentController::class);
-   Route::resource('users', UserController::class);
-   Route::resource('positions', PositionController::class);
-   Route::resource('roles', RoleController::class);
+
+    Route::resource('departments', DepartmentController::class);
+    Route::resource('users', UserController::class);
+    Route::resource('positions', PositionController::class);
+    Route::resource('roles', RoleController::class);
 });
 
 require __DIR__.'/settings.php';

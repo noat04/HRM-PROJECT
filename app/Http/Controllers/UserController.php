@@ -193,4 +193,21 @@ class UserController extends Controller
         $user->restore();
         return redirect()->route('users.index')->with('success', 'Tuyệt vời! Đã khôi phục người dùng thành công.');
     }
+
+    // Hàm cập nhật trạng thái (Active/Inactive)
+    public function updateStatus(Request $request, User $user) 
+    {
+        // Kiểm tra dữ liệu gửi lên chỉ được phép là 'active' hoặc 'inactive'
+        $validated = $request->validate([
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        // Cập nhật trạng thái
+        $user->update([
+            'status' => $validated['status']
+        ]);
+
+        // Trả về trang cũ kèm thông báo
+        return back()->with('success', 'Tuyệt vời! Đã cập nhật trạng thái tài khoản.');
+    }
 }
