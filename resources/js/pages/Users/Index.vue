@@ -42,6 +42,7 @@ interface PaginatedUsers {
 
 const props = defineProps<{
     users: PaginatedUsers;
+    roles: Role[]; // <--- THÊM DÒNG NÀY VÀO LÀ HẾT LỖI
     processing?: boolean;
 }>();
 
