@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, Link, router,usePage } from '@inertiajs/vue3';
-import { computed,ref,watch } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription ,CardFooter} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { Pencil, Trash2, Eye, Plus,Search } from 'lucide-vue-next';
+import { Pencil, Trash2, Eye, Plus, Search } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
 interface Position {
@@ -82,7 +82,7 @@ const deletePosition = (id: number) => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-6 p-6">
-           <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Quản lý Chức vụ</h1>
                     <p class="text-muted-foreground">Danh sách các chức vụ trong hệ thống.</p>
@@ -106,9 +106,7 @@ const deletePosition = (id: number) => {
                         </Link>
                 </div>
             </div>
-        </div>
     
-            <!-- Thông báo Flash Message -->
             <Transition
                 enter-active-class="transition ease-out duration-300"
                 enter-from-class="opacity-0 -translate-y-2"
@@ -128,7 +126,6 @@ const deletePosition = (id: number) => {
                 </div>
             </Transition>
 
-            <!-- Bảng danh sách -->
             <Card>
                 <CardHeader>
                     <CardTitle>Danh sách Chức vụ</CardTitle>
@@ -193,11 +190,13 @@ const deletePosition = (id: number) => {
                                     link.active ? 'bg-primary text-primary-foreground border-primary' : 'bg-white border-gray-300 hover:bg-gray-50',
                                     !link.url ? 'opacity-50 cursor-not-allowed' : ''
                                 ]"
-                                v-html="link.label"
-                            />
+                            >
+                                <span v-html="link.label"></span>
+                            </Link>
                         </div>
                     </div>
                 </CardFooter>
             </Card>
-    </AppLayout>
+            
+        </div> </AppLayout>
 </template>

@@ -5,7 +5,6 @@ import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
 import { Pencil, Trash2, Eye, Plus, Search } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
@@ -275,16 +274,18 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
                                     :variant="link.active ? 'default' : 'outline'"
                                     size="sm"
                                     class="min-w-8 shadow-sm"
-                                    v-html="link.label"
-                                />
+                                >
+                                    <span v-html="link.label"></span>
+                                </Button>
                                 <Button
                                     v-else
                                     variant="outline"
                                     size="sm"
                                     disabled
                                     class="min-w-8 opacity-50"
-                                    v-html="link.label"
-                                />
+                                >
+                                    <span v-html="link.label"></span>
+                                </Button>
                             </template>
                         </div>
                     </div>

@@ -10,7 +10,7 @@ import { ArrowLeft } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
 // Nhận danh sách vai trò từ Controller
-const props = defineProps<{
+defineProps<{
     roles: Array<{ id: number; name: string; display_name: string }>;
 }>();
 

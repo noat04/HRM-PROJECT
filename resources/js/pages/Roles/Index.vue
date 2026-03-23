@@ -9,8 +9,8 @@ import type { BreadcrumbItem } from '@/types';
 import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
-// Nhận dữ liệu từ Controller
-const props = defineProps<{
+// 👇 ĐÃ SỬA LỖI ESLINT: Chỉ cần gọi defineProps, không cần gán vào biến 'const props ='
+defineProps<{
     roles: Array<{
         id: number;
         name: string;
@@ -47,7 +47,6 @@ const deleteRole = (id: number) => {
     }
 };
 
-
 </script>
 
 <template>
@@ -55,6 +54,7 @@ const deleteRole = (id: number) => {
 
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-6 p-6 max-w-7xl mx-auto w-full">
+            
             <div class="flex items-center justify-between">
                 <div>
                     <h1 class="text-2xl font-bold tracking-tight">Quản lý Vai trò</h1>
@@ -67,8 +67,7 @@ const deleteRole = (id: number) => {
                     </Button>
                 </Link>
             </div>
-        </div>
-              <!-- Thông báo Flash Message -->
+            
             <Transition
                 enter-active-class="transition ease-out duration-300"
                 enter-from-class="opacity-0 -translate-y-2"
@@ -124,16 +123,16 @@ const deleteRole = (id: number) => {
                                     <td class="py-3 px-4 text-right">
                                         <div class="flex justify-end gap-2">
                                             <Link :href="`/roles/${role.id}`">
-                                                <Button variant="ghost" size="icon">
+                                                <Button variant="ghost" size="icon" title="Xem chi tiết">
                                                     <Eye class="h-4 w-4" />
                                                 </Button>
                                             </Link>
                                             <Link :href="`/roles/${role.id}/edit`">
-                                                <Button variant="ghost" size="icon">
+                                                <Button variant="ghost" size="icon" title="Chỉnh sửa">
                                                     <Edit class="h-4 w-4" />
                                                 </Button>
                                             </Link>
-                                            <Button variant="ghost" size="icon" @click="deleteRole(role.id)">
+                                            <Button variant="ghost" size="icon" title="Xóa" @click="deleteRole(role.id)">
                                                 <Trash2 class="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -144,5 +143,6 @@ const deleteRole = (id: number) => {
                     </div>
                 </CardContent>
             </Card>
-    </AppLayout>
+
+        </div> </AppLayout>
 </template>

@@ -6,7 +6,6 @@ import { computed,ref,watch } from 'vue'; // 👇 Import computed của Vue
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription ,CardFooter} from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
 import { Pencil, Trash2, Eye, Plus,Search } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
@@ -223,22 +222,25 @@ const deleteDepartment = (id: number) => {
                             <!-- Khi bạn gọi hàm Department::paginate(3) ở Backend, Laravel rất thông minh. Nó không chỉ trả về dữ liệu bảng, 
                              mà còn tự động tính toán và sinh ra một mảng tên là links chứa toàn bộ cấu trúc các nút bấm phân trang. -->
                             <template v-for="(link, index) in departments.links" :key="index">
-                                <Button
+                               <Button
                                     v-if="link.url"
                                     @click="router.get(link.url, {}, { preserveState: true })"
                                     :variant="link.active ? 'default' : 'outline'"
                                     size="sm"
                                     class="min-w-8"
-                                    v-html="link.label"
-                                />
+                                >
+                                    <span v-html="link.label"></span>
+                                </Button>
+                                
                                 <Button
                                     v-else
                                     variant="ghost"
                                     size="sm"
                                     disabled
                                     class="min-w-8"
-                                    v-html="link.label"
-                                />
+                                >
+                                    <span v-html="link.label"></span>
+                                </Button>
                             </template>
                         </div>
                         </div>

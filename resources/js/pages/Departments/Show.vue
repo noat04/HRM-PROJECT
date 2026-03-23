@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, Link, router,usePage } from '@inertiajs/vue3';
-import { computed } from 'vue'; // 👇 Import computed của Vue
+import { Head, Link, router } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Spinner } from '@/components/ui/spinner';
-import { Pencil, Trash2, Eye, Plus } from 'lucide-vue-next';
+import { Card, CardContent } from '@/components/ui/card';
+import { Pencil, Trash2 } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
 const props = defineProps<{

@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Eye, Edit, Trash2 } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
-const props = defineProps<{
+defineProps<{
     permissions: Array<{
         id: number;
         name: string;
