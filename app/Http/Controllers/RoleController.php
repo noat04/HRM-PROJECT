@@ -86,9 +86,9 @@ class RoleController extends Controller
 
             // 🔥 BÍ KÍP TỐI THƯỢNG: Lọc sạch các giá trị null/rỗng trước khi lưu
             $rawIds = $request->input('permission_ids', []);
-           // Thay vì: $cleanIds = array_filter($rawIds);
-// Dùng hàm này để chỉ lọc ra những giá trị không rỗng (null hoặc chuỗi rỗng)
-$cleanIds = array_filter($rawIds, fn($val) => !is_null($val) && $val !== '');
+            // Thay vì: $cleanIds = array_filter($rawIds);
+            // Dùng hàm này để chỉ lọc ra những giá trị không rỗng (null hoặc chuỗi rỗng)
+            $cleanIds = array_filter($rawIds, fn($val) => !is_null($val) && $val !== '');
             $role->permissions()->sync($cleanIds); 
             
         });
