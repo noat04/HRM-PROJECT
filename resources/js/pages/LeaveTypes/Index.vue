@@ -25,7 +25,7 @@ interface PaginatedLeaveTypes {
     links: { url: string | null; label: string; active: boolean }[];
 }
 
-const props = defineProps<{
+defineProps<{
     leaveTypes: PaginatedLeaveTypes;
 }>();
 

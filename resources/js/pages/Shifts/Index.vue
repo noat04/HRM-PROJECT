@@ -31,7 +31,7 @@ interface PaginatedShifts {
     links: { url: string | null; label: string; active: boolean }[];
 }
 
-const props = defineProps<{
+defineProps<{
     shifts: PaginatedShifts;
 }>();
 

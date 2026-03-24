@@ -42,7 +42,7 @@ interface User {
     name: string;
 }
 
-const props = defineProps<{
+defineProps<{
     employees: Employee[];
     departments: Department[];
     positions: Position[];

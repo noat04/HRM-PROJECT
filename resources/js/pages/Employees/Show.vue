@@ -43,7 +43,7 @@ interface Employee {
     manager?: Manager;
 }
 
-const props = defineProps<{
+defineProps<{
     employee: Employee;
 }>();
 
