@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Building } from 'lucide-vue-next';
+// 👇 Đã import thêm các Icon cho phù hợp với từng Menu
+import { BookOpen, Folder, LayoutGrid, Building, Users, Briefcase, Shield, UserCheck, Clock, CalendarDays } from 'lucide-vue-next';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -15,19 +16,22 @@ import {
 } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import AppLogo from './AppLogo.vue';
+
+// Các routes import
 import { dashboard } from '@/routes';
-// 2. Import index từ thư mục departments và đổi tên thành departmentsIndex
 import { index as departmentsIndex } from '@/routes/departments';
 import { index as usersIndex } from '@/routes/users';
 import { index as positionsIndex } from '@/routes/positions';
 import { index as rolesIndex } from '@/routes/roles';
+import { index as employeesIndex } from '@/routes/employees';
+import { index as shiftsIndex } from '@/routes/shifts';
+import { index as leaveTypesIndex } from '@/routes/leaves/types';
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
     },
-    // 👇 3. BỔ SUNG MENU PHÒNG BAN VÀO ĐÂY
     {
         title: 'Phòng ban',
         href: departmentsIndex(), 
@@ -36,19 +40,34 @@ const mainNavItems: NavItem[] = [
      {
         title: 'Người dùng',
         href: usersIndex(), 
-        icon: Building,
+        icon: Users, // 👈 Đổi thành icon Users
     },
     {
         title: 'Chức vụ',
         href: positionsIndex(), 
-        icon: Building,
+        icon: Briefcase, // 👈 Đổi thành icon Cặp xách
     },
     {
         title: 'Vai trò',
         href: rolesIndex(), 
-        icon: Building,
+        icon: Shield, // 👈 Đổi thành icon Cái khiên
     },
-
+    {
+        title: 'Nhân viên',
+        href: employeesIndex(), 
+        icon: UserCheck, // 👈 Đổi thành icon Nhân sự
+    },
+    {
+        title: 'Ca làm việc',
+        href: shiftsIndex(), 
+        icon: Clock, // 👈 Đổi thành icon Đồng hồ
+    },
+    // 👇 ĐÃ SỬA LỖI DỞ DANG Ở ĐÂY: Thêm menu Loại nghỉ phép
+   {
+        title: 'Nghỉ phép',
+        href: leaveTypesIndex(), 
+        icon: CalendarDays, 
+    }
 ];
 
 const footerNavItems: NavItem[] = [

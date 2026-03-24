@@ -18,4 +18,14 @@ enum EmployeeStatus: string
             self::PAUSED => 'Tạm hoãn',
         };
     }
+
+    public static function options(): array
+    {
+        return [
+            ['value' => self::PROBATION->value, 'label' => self::PROBATION->label()],
+            ['value' => self::OFFICIAL->value, 'label' => self::OFFICIAL->label()],
+            ['value' => self::RESIGNED->value, 'label' => self::RESIGNED->label()],
+            ['value' => self::PAUSED->value, 'label' => self::PAUSED->label()],
+        ];
+    }
 }

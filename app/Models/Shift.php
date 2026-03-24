@@ -28,6 +28,7 @@ class Shift extends Model
         'work_days' => 'array', // Tự động chuyển JSON DB -> Mảng PHP
     ];
 
+
     // --- LOGIC NGHIỆP VỤ (BUSINESS LOGIC) ---
 
     /**
