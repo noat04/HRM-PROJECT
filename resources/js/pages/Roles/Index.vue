@@ -10,7 +10,7 @@ import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
 // 👇 ĐÃ SỬA LỖI ESLINT: Chỉ cần gọi defineProps, không cần gán vào biến 'const props ='
-defineProps<{
+const props = defineProps<{
     roles: Array<{
         id: number;
         name: string;
@@ -19,6 +19,7 @@ defineProps<{
         permissions: Array<{
             name: string;
         }>;
+        deleted_at?: string | null; 
     }>;
 }>();
 
@@ -46,7 +47,12 @@ const deleteRole = (id: number) => {
         router.delete(`/roles/${id}`);
     }
 };
-
+// 👇 Hàm gọi khôi phục dữ liệu
+const restoreRole = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn khôi phục vai trò này?')) {
+        router.put(`/roles/${id}/restore`); // Gọi đúng ID truyền vào
+    }
+};
 </script>
 
 <template>
@@ -120,23 +126,31 @@ const deleteRole = (id: number) => {
                                             <span v-if="role.permissions.length === 0" class="text-xs text-muted-foreground">Chưa có quyền</span>
                                         </div>
                                     </td>
+                                    
                                     <td class="py-3 px-4 text-right">
-                                        <div class="flex justify-end gap-2">
-                                            <Link :href="`/roles/${role.id}`">
-                                                <Button variant="ghost" size="icon" title="Xem chi tiết">
-                                                    <Eye class="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                            <Link :href="`/roles/${role.id}/edit`">
-                                                <Button variant="ghost" size="icon" title="Chỉnh sửa">
-                                                    <Edit class="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                            <Button variant="ghost" size="icon" title="Xóa" @click="deleteRole(role.id)">
-                                                <Trash2 class="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </td>
+    <div v-if="role.deleted_at" class="flex items-center justify-end gap-2">
+        <span class="text-xs text-red-500 font-semibold mr-2">Đã xóa</span>
+        <Button @click="restoreRole(role.id)" variant="outline" class="text-emerald-600 border-emerald-600 hover:bg-emerald-50">
+            Khôi phục
+        </Button>
+    </div>
+
+    <div v-else class="flex justify-end gap-2">
+        <Link :href="`/roles/${role.id}`">
+            <Button variant="ghost" size="icon" title="Xem chi tiết">
+                <Eye class="h-4 w-4" />
+            </Button>
+        </Link>
+        <Link :href="`/roles/${role.id}/edit`">
+            <Button variant="ghost" size="icon" title="Chỉnh sửa">
+                <Edit class="h-4 w-4" />
+            </Button>
+        </Link>
+        <Button variant="ghost" size="icon" title="Xóa" @click="deleteRole(role.id)">
+            <Trash2 class="h-4 w-4" />
+        </Button>
+    </div>
+</td>
                                 </tr>
                             </tbody>
                         </table>

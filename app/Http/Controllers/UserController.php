@@ -17,7 +17,8 @@ class UserController extends Controller
 {
     public function index(Request $request) 
     {
-        $query = User::with('roles');
+        // 👇 Thêm ->withTrashed() để lấy cả dữ liệu đã xóa mềm
+        $query = User::with('roles')->withTrashed();
     
         if ($request->has('search') && $request->search != '') {
             $query->where('name', 'like', "%{$request->search}%")

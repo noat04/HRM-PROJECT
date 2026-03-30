@@ -38,11 +38,16 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        // 👇 BẮT BUỘC THÊM DÒNG NÀY: Lấy thông tin người dùng gán vào biến $user
+        $user = $request->user();
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+                // 👇 Gửi danh sách Role và Permission của User này sang cho Vue
+                'roles' => $user ? $user->roles->pluck('name') : [],
+                'permissions' => $user ? $user->getAllPermissions()->pluck('name') : [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [

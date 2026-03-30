@@ -64,9 +64,9 @@ class PayrollPeriod extends Model
      */
     public function getStandardWorkingDaysAttribute()
     {
-        // Logic đơn giản: Đếm số ngày từ start -> end trừ T7, CN
-        return $this->start_date->diffInDaysFiltered(function (Carbon $date) {
+        // 👇 Xóa chữ "Carbon" đi, chỉ giữ lại biến $date
+        return $this->start_date->diffInDaysFiltered(function ($date) {
             return !$date->isWeekend();
-        }, $this->end_date) + 1; // +1 vì diffInDays không tính ngày cuối
+        }, $this->end_date) + 1; 
     }
 }

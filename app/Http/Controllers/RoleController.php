@@ -14,7 +14,8 @@ class RoleController extends Controller
 {
     public function index()
     {
-        $roles = Role::with('permissions')->get();
+       // 👇 Thêm withTrashed() vào đây
+        $roles = Role::with('permissions')->withTrashed()->get();
         $permissions = Permission::all();
         
         return Inertia::render('Roles/Index', [
@@ -145,5 +146,18 @@ class RoleController extends Controller
             'role' => $role,
             'permissions' => $permissions,
         ]);
+    }
+
+    public function restore($id) 
+    {
+        // Bắt buộc phải có withTrashed() thì findOrFail mới tìm thấy ID đã bị xóa
+        $role = Role::withTrashed()->findOrFail($id);
+        
+        $role->restore();
+        
+        // Dọn dẹp Cache của Spatie sau khi khôi phục
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return redirect()->route('roles.index')->with('success', 'Tuyệt vời! Đã khôi phục vai trò thành công.');
     }
 }
