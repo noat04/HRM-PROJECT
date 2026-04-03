@@ -16,6 +16,7 @@ class EmployeeController extends Controller
 {
     public function index(Request $request)
     {
+        $restore = Employee::onlyTrashed()->get();
         $query = Employee::query();
         $departments = Department::all();
         $positions = Position::all();
@@ -26,6 +27,7 @@ class EmployeeController extends Controller
             'employees' => $query->paginate(3)->withQueryString(),
             'departments' => $departments,
             'positions' => $positions,
+            'restore' => $restore,
             'filters' => $request->only(['search'])
         ]);
     }
@@ -86,8 +88,36 @@ class EmployeeController extends Controller
 
     public function destroy(Employee $employee)
     {
+        $employee->status = 'paused';
+        $user = User::find($employee->user_id);
+        $user->status = 'inactive';
+        $user->save();
+        $employee->save();
         $employee->delete();
 
+        return redirect()->route('employees.index');
+    }
+
+    public function restore($id)
+    {
+        $employee = Employee::withTrashed()->find($id);
+        if ($employee) {
+            $employee->status = 'probation';
+            $user = User::find($employee->user_id);
+            $user->status = 'active';
+            $user->save();
+            $employee->save();
+            $employee->restore();
+        }
+        return redirect()->route('employees.index');
+    }
+
+    public function forceDelete($id)
+    {
+        $employee = Employee::withTrashed()->find($id);
+        if ($employee) {
+            $employee->forceDelete();
+        }
         return redirect()->route('employees.index');
     }
 }

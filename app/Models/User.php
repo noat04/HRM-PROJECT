@@ -63,5 +63,16 @@ class User extends Authenticatable
         ];
     }
 
+    protected static function booted()
+    {
+        // Sự kiện forceDeleted sẽ tự động chạy ngay sau khi gọi $user->forceDelete()
+        static::forceDeleted(function ($user) {
+            // Tháo toàn bộ Vai trò
+            $user->roles()->detach();
+            
+            // // Tháo toàn bộ Quyền hạn trực tiếp (nếu có cấp riêng cho User)
+            // $user->permissions()->detach();
+        });
+    }
 
 }

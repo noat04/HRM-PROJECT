@@ -5,9 +5,10 @@ import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Pencil, Trash2, Eye, Plus, Search } from 'lucide-vue-next';
+import { Pencil, Trash2, Eye, Plus, Search ,RotateCcw} from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
-
+import { usePermission } from '@/composables/usePermission';
+const { hasRole,hasPermission } = usePermission();
 // ==========================================
 // KHAI BÁO BIẾN
 // ==========================================
@@ -41,6 +42,7 @@ interface PaginatedUsers {
 
 const props = defineProps<{
     users: PaginatedUsers;
+    restore: User[];
     roles: Role[]; // <--- THÊM DÒNG NÀY VÀO LÀ HẾT LỖI
     processing?: boolean;
 }>();
@@ -120,6 +122,24 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
         hour: '2-digit', minute: '2-digit',
     }).format(date);
 };
+
+const viewingRestore = ref(false);
+
+const toggleRestoreView = () => {
+    viewingRestore.value = !viewingRestore.value;
+};
+
+const restoreUser = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn khôi phục người dùng này không?')) {
+        router.put(`/users/${id}/restore`);
+    }
+};
+
+const forceDeleteUser = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn xóa vĩnh viễn người dùng này không?')) {
+        router.delete(`/users/${id}/force-delete`);
+    }
+};
 </script>
 
 <template>
@@ -143,12 +163,19 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
                             class="pl-8 bg-white" 
                         />
                     </div>
-
-                    <Link href="/users/create">
-                        <Button class="gap-2">
-                            <Plus class="h-4 w-4" /> Thêm mới
+                    <div class="flex gap-2">
+                        <Button @click="toggleRestoreView" :variant="viewingRestore ? 'default' : 'outline'" class="gap-2">
+                            <Trash2 class="h-4 w-4" /> {{ viewingRestore ? 'Đóng' : 'Thùng rác' }}
                         </Button>
-                    </Link>
+                        <div v-if="hasRole('Super Admin')">
+                            <Link href="/users/create">
+                                <Button class="gap-2">
+                                    <Plus class="h-4 w-4" /> Thêm mới
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                    
                 </div>
             </div>
 
@@ -173,8 +200,9 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
 
             <Card>
                 <CardHeader class="px-6 py-4">
-                    <CardTitle>Dữ liệu người dùng</CardTitle>
-                    <CardDescription>Hiển thị tổng cộng {{ users.total }} người dùng</CardDescription>
+                    <CardTitle>{{ viewingRestore ? 'Thùng rác vai trò' : 'Dữ liệu vai trò' }}</CardTitle>
+                    <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ users?.data?.length || 0 }} người dùng.</CardDescription>
+                    <CardDescription v-else>Hiển thị danh sách người dùng đã xóa mềm lưu trong thùng rác.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div class="overflow-x-auto">
@@ -189,7 +217,7 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
                                     <th scope="col" class="px-6 py-3">Hành động</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody v-if="!viewingRestore" class="divide-y">
                                 <tr v-for="user in users.data" :key="user.id" class="bg-white border-b hover:bg-gray-50 transition-colors">
                                     <td class="px-6 py-4 font-medium text-gray-900">{{ user.id }}</td>
                                     <td class="px-6 py-4">
@@ -226,7 +254,7 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
                                             :class="getStatusColor(user.status)"
                                             class="px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors"
                                         >
-                                            {{ user.status === 'active' ? 'Hoạt động' : 'Đã khóa' }}
+                                            {{ user.status === 'active' ? 'Hoạt động' : 'Không hoạt động' }}
                                         </button>
                                     </td>
 
@@ -234,7 +262,7 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-2">
                                             <Link :href="`/users/${user.id}`">
-                                                <Button variant="outline" size="icon" class="h-8 w-8 text-blue-600 border-blue-200 hover:bg-blue-50">
+                                                <Button  variant="outline" size="icon" class="h-8 w-8 text-blue-600 border-blue-200 hover:bg-blue-50">
                                                     <Eye class="h-4 w-4" />
                                                 </Button>
                                             </Link>
@@ -250,6 +278,59 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
                                     </td>
                                 </tr>
                                 <tr v-if="users.data.length === 0">
+                                    <td colspan="7" class="h-32 text-center text-muted-foreground">
+                                        <div class="flex flex-col items-center justify-center">
+                                            <Search class="h-8 w-8 mb-2 opacity-50" />
+                                            <p>Không tìm thấy dữ liệu người dùng nào.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tbody v-else class="divide-y">
+                                <tr v-for="user in restore" :key="user.id" class="bg-white border-b hover:bg-gray-50 transition-colors">
+                                    <td class="px-6 py-4 font-medium text-gray-900">{{ user.id }}</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <div v-if="user.avatar" class="h-8 w-8 rounded-full overflow-hidden bg-gray-100 border">
+                                                <img :src="`/storage/${user.avatar}`" class="h-full w-full object-cover" alt="avatar" />
+                                            </div>
+                                            <div v-else class="h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">
+                                                {{ user.name.charAt(0).toUpperCase() }}
+                                            </div>
+                                            <span class="font-medium">{{ user.name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">{{ user.email }}</td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex flex-wrap gap-1">
+                                            <span v-if="!user.roles || user.roles.length === 0" class="text-xs text-gray-400 italic">
+                                                Chưa cấp quyền
+                                            </span>
+                                            <span v-for="role in user.roles" :key="role.id" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                {{ role.display_name }}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                           {{ user.status === 'active' ? 'Hoạt động' : 'Không hoạt động' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-500">
+                                        {{ formatDate(user.deleted_at) }}
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-2">
+                                            <Button variant="outline" size="icon" class="h-8 w-8 text-green-600 border-green-200 hover:bg-green-50" @click="restoreUser(user.id)">
+                                                <RotateCcw class="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="outline" size="icon" class="h-8 w-8 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700" @click="forceDeleteUser(user.id)">
+                                                <Trash2 class="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="restore.length === 0">
                                     <td colspan="7" class="h-32 text-center text-muted-foreground">
                                         <div class="flex flex-col items-center justify-center">
                                             <Search class="h-8 w-8 mb-2 opacity-50" />

@@ -17,7 +17,7 @@ use App\Http\Controllers\SalaryComponentController;
 use App\Http\Controllers\EmployeeSalaryStructureController;
 use App\Http\Controllers\PayrollPeriodController;
 use App\Http\Controllers\PayslipController;
-
+use App\Http\Controllers\PermissionController;
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canRegister' => Features::enabled(Features::registration()),
@@ -37,17 +37,27 @@ Route::middleware(['auth', CheckUserStatus::class])->group(function () {
     Route::middleware(['role:Super Admin'])->group(function () {
         Route::put('users/{user}/status', [UserController::class, 'updateStatus'])->name('users.status');
         Route::put('users/{id}/restore', [UserController::class, 'restore'])->name('users.restore');
+        Route::delete('users/{id}/force-delete', [UserController::class, 'forceDelete'])->name('users.force-delete');
         Route::resource('users', UserController::class);
+        
         Route::resource('roles', RoleController::class);
-
         Route::put('roles/{id}/restore', [RoleController::class, 'restore'])->name('roles.restore');
+        Route::delete('roles/{id}/force-delete', [RoleController::class, 'forceDelete'])->name('roles.force-delete');
+        
+        Route::resource('permissions', PermissionController::class);
+        Route::put('permissions/{id}/restore', [PermissionController::class, 'restore'])->name('permissions.restore');
+        Route::delete('permissions/{id}/force-delete', [PermissionController::class, 'forceDelete'])->name('permissions.force-delete');
     });
 
     // ==========================================
     // 2. NHÓM CHỈ DÀNH CHO HR MANAGER (Cấu hình hệ thống)
     // ==========================================
     Route::middleware(['role:HR Manager'])->group(function () {
+        Route::put('departments/{id}/restore', [DepartmentController::class, 'restore'])->name('departments.restore');
+        Route::delete('departments/{id}/force-delete', [DepartmentController::class, 'forceDelete'])->name('departments.force-delete');
         Route::resource('departments', DepartmentController::class);
+        Route::put('positions/{id}/restore', [PositionController::class, 'restore'])->name('positions.restore');
+        Route::delete('positions/{id}/force-delete', [PositionController::class, 'forceDelete'])->name('positions.force-delete');
         Route::resource('positions', PositionController::class);
         Route::resource('shifts', ShiftController::class);
         
@@ -67,10 +77,12 @@ Route::middleware(['auth', CheckUserStatus::class])->group(function () {
     // ==========================================
     // 3. NHÓM DÙNG CHUNG (Cả HR Manager và Employee đều được truy cập)
     // ==========================================
-    Route::middleware(['role:HR Manager|Employee'])->group(function () {
+    Route::middleware(['role:HR Manager|Employee|Super Admin'])->group(function () {
         
         // Xem danh sách nhân viên (Sẽ được lọc trong Controller)
         Route::resource('employees', EmployeeController::class);
+        Route::put('employees/{id}/restore', [EmployeeController::class, 'restore'])->name('employees.restore');
+        Route::delete('employees/{id}/force-delete', [EmployeeController::class, 'forceDelete'])->name('employees.force-delete');
 
         // Yêu cầu nghỉ phép & Số dư nghỉ phép
         Route::prefix('leaves')->name('leaves.')->group(function () {

@@ -67,9 +67,14 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-muted-foreground">ID Quản lý</label>
                                 <p class="text-lg">{{ department.manager_id || 'N/A' }}</p>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium text-muted-foreground">Phòng ban cha</label>
+                                <p class="text-lg">{{ department.parent_id || 'N/A' }}</p>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-medium text-muted-foreground">Cấp bậc</label>

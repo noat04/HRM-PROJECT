@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { watch } from 'vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
@@ -7,19 +8,42 @@ import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
+interface Department {
+    id: number;
+    name: string;
+    level: number;
+}
+interface Employee {
+    id: number;
+    full_name: string;
+}
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Phòng ban', href: '/departments' },
     { title: 'Thêm mới', href: '/departments/create' },
 ];
+const props = defineProps<{
+    departments: Department[];
+    employees: Employee[];
+}>();
 
 const form = useForm({
     name: '',
     parent_id: null as number | null,
     manager_id: null as number | null,
     description: '',
-    level: 1,
+    level: 1 as number,
 });
 
+watch(() => form.parent_id, (newParentId) => {
+    if (newParentId) {
+        const parent = props.departments.find((d) => d.id === newParentId);
+        if (parent) {
+            form.level = parent.level + 1;
+            return;
+        }
+    }
+    form.level = 1;
+});
 const submitForm = () => {
     form.post('/departments');
 };
@@ -61,16 +85,20 @@ const submitForm = () => {
                             <p v-if="form.errors.name" class="text-sm text-destructive">{{ form.errors.name }}</p>
                         </div>
 
+                        
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
                             <div class="space-y-2">
-                                <label class="text-sm font-medium">ID Quản lý (Manager)</label>
-                                <input 
-                                    v-model="form.manager_id" 
-                                    type="number" 
+                                <label class="text-sm font-medium">Phòng ban cha (Parent ID)</label>
+                                <select 
+                                    v-model="form.parent_id" 
                                     class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
-                                    placeholder="Ví dụ: 1"
-                                />
+                                >
+                                    <option :value="null">Không có</option>
+                                    <option v-for="department in departments" :value="department.id">{{ department.name }}</option>
+                                </select>
                             </div>
+
                             <div class="space-y-2">
                                 <label class="text-sm font-medium">Cấp bậc (Level) <span class="text-destructive">*</span></label>
                                 <input 
@@ -79,6 +107,17 @@ const submitForm = () => {
                                     class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
                                     required 
                                 />
+                            </div>
+                        
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">ID Quản lý (Manager)</label>
+                                <select 
+                                    v-model="form.manager_id" 
+                                    class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
+                                >
+                                    <option :value="null">Không có</option>
+                                    <option v-for="employee in employees" :value="employee.id">{{ employee.full_name }}</option>
+                                </select>
                             </div>
                         </div>
 

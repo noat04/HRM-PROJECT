@@ -7,6 +7,8 @@ use App\Models\Role;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Http\Requests\Crud\Role\RoleRequest;
+
 // 👇 1. BẮT BUỘC IMPORT DÒNG NÀY ĐỂ TỰ XÓA CACHE
 use Spatie\Permission\PermissionRegistrar;
 
@@ -15,11 +17,13 @@ class RoleController extends Controller
     public function index()
     {
        // 👇 Thêm withTrashed() vào đây
-        $roles = Role::with('permissions')->withTrashed()->get();
+       $restore = Role::with('permissions')->onlyTrashed()->get();
+       $roles = Role::with('permissions')->paginate(10);
         $permissions = Permission::all();
         
         return Inertia::render('Roles/Index', [
             'roles' => $roles,
+            'restore' => $restore,
             'permissions' => $permissions,
         ]);
     }
@@ -33,14 +37,9 @@ class RoleController extends Controller
         ]);
     }
 
-   public function store(Request $request)
+   public function store(RoleRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:191|unique:roles,name',
-            'display_name' => 'required|string|max:255',
-            'description' => 'nullable|string|max:255',
-            'permission_ids' => 'nullable|array', 
-        ]);
+        $validated = $request->validated();
 
         DB::transaction(function () use ($request, $validated) {
             $role = Role::create([
@@ -64,13 +63,35 @@ class RoleController extends Controller
             ->with('success', 'Đã khởi tạo vai trò và phân quyền thành công!');
     }
 
-    public function update(Request $request, $id)
+    // public function update(RoleRequest $request, $id)
+    // {
+    //     $validated = $request->validated();
+
+    //     DB::transaction(function () use ($request, $validated) {
+    //         $role = Role::create([
+    //             'name' => $validated['name'],
+    //             'display_name' => $validated['display_name'], 
+    //             'description' => $validated['description'],
+    //             'guard_name' => 'web',
+    //         ]);
+
+    //         // 🔥 BÍ KÍP TỐI THƯỢNG: Lọc sạch các giá trị null/rỗng trước khi lưu
+    //         $rawIds = $request->input('permission_ids', []);
+    //         $cleanIds = array_filter($rawIds); // Máy lọc rác tự động của PHP
+            
+    //         $role->permissions()->sync($cleanIds);
+    //     });
+
+    //     // Tự động dọn dẹp bộ nhớ tạm của Spatie
+    //     app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+    //     return redirect()->route('roles.index')
+    //         ->with('success', 'Đã khởi tạo vai trò và phân quyền thành công!');
+    // }
+
+    public function update(RoleRequest $request, $id)
     {
-        $validated = $request->validate([
-            'display_name'   => 'required|string|max:255',
-            'description'    => 'nullable|string|max:255',
-            'permission_ids' => 'nullable|array',
-        ]);
+        $validated = $request->validated();
 
         $role = Role::findOrFail($id);
 
@@ -152,12 +173,25 @@ class RoleController extends Controller
     {
         // Bắt buộc phải có withTrashed() thì findOrFail mới tìm thấy ID đã bị xóa
         $role = Role::withTrashed()->findOrFail($id);
-        
+        $role->
         $role->restore();
         
         // Dọn dẹp Cache của Spatie sau khi khôi phục
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
 
         return redirect()->route('roles.index')->with('success', 'Tuyệt vời! Đã khôi phục vai trò thành công.');
+    }
+
+    public function forceDelete($id)
+    {
+        $role = Role::withTrashed()->findOrFail($id);
+        
+        // Xóa vĩnh viễn
+        $role->forceDelete();
+        
+        // Dọn dẹp Cache
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        return redirect()->route('roles.index')->with('success', 'Đã xóa vĩnh viễn vai trò này!');
     }
 }

@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Gate;
+
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +25,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::before(function ($user, $ability) {
+            // Nếu là Super Admin, trả về true (Cho phép làm mọi việc)
+            // LƯU Ý: Phải kiểm tra đúng tên Role trong Database của bạn nhé
+            return $user->hasRole('Super Admin') ? true : null;
+        });
         $this->configureDefaults();
     }
 

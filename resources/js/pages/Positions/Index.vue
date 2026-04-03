@@ -5,7 +5,7 @@ import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Pencil, Trash2, Eye, Plus, Search } from 'lucide-vue-next';
+import { Pencil, Trash2, Eye, Plus, Search, RotateCcw } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 
 interface Position {
@@ -31,6 +31,7 @@ interface PaginatedPositions {
 
 const props = defineProps<{
     positions: PaginatedPositions;
+    restore: Position[];
     processing?: boolean;
 }>();
 
@@ -74,6 +75,24 @@ const deletePosition = (id: number) => {
         router.delete(`/positions/${id}`);
     }
 };
+
+const viewingRestore = ref(false);
+
+const toggleRestoreView = () => {
+    viewingRestore.value = !viewingRestore.value;
+};
+
+const restorePosition = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn khôi phục chức vụ này không?')) {
+        router.put(`/positions/${id}/restore`);
+    }
+};
+
+const forceDeletePosition = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn xóa chức vụ này không?')) {
+        router.delete(`/positions/${id}/force-delete`);
+    }
+};
 </script>
 
 <template>      
@@ -97,12 +116,18 @@ const deletePosition = (id: number) => {
                                 class="pl-8 bg-white" 
                             />
                         </div>
-
-                        <Link href="/positions/create">
+                        <div class="flex gap-2">
+                            <Button @click="toggleRestoreView" :variant="viewingRestore ? 'default' : 'outline'">
+                                <Trash2 class="h-4 w-4" />
+                                {{ viewingRestore ? 'Đóng' : 'Thùng rác' }}
+                            </Button>
+                            <Link href="/positions/create">
                             <Button class="gap-2">
                                 <Plus class="h-4 w-4" /> Thêm mới
                             </Button>
                         </Link>
+                        </div>
+                        
                 </div>
             </div>
     
@@ -127,10 +152,9 @@ const deletePosition = (id: number) => {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Danh sách Chức vụ</CardTitle>
-                    <CardDescription>
-                        Hiển thị tổng cộng {{ positions.total }} chức vụ.
-                    </CardDescription>
+                    <CardTitle>{{ viewingRestore ? 'Thùng rác chức vụ' : 'Dữ liệu chức vụ' }}</CardTitle>
+                    <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ positions.total }} chức vụ.</CardDescription>
+                    <CardDescription v-else>Hiển thị danh sách chức vụ đã xóa mềm lưu trong thùng rác.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div class="overflow-x-auto">
@@ -145,7 +169,7 @@ const deletePosition = (id: number) => {
                                     <th scope="col" class="px-6 py-3 text-right">Hành động</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody v-if="!viewingRestore" class="divide-y">
                                 <tr v-for="position in positions.data" :key="position.id" class="bg-white border-b hover:bg-gray-50">
                                     <td class="px-6 py-4 font-medium text-gray-900">{{ position.name }}</td>
                                     <td class="px-6 py-4">{{ position.code || '-' }}</td>
@@ -168,7 +192,27 @@ const deletePosition = (id: number) => {
                                         </Button>
                                     </td>
                                 </tr>
-                                <tr v-if="positions.data.length === 0">
+                                <tr v-if="positions?.data?.length === 0">
+                                    <td colspan="6" class="px-6 py-4 text-center text-muted-foreground">Không tìm thấy chức vụ nào.</td>
+                                </tr>
+                            </tbody>
+                            <tbody v-else class="divide-y bg-red-50/10">
+                                <tr v-for="dept in restore" :key="dept.id" class="transition-colors hover:bg-muted/30 opacity-80">
+                                    <td class="px-6 py-4 font-medium text-gray-900">{{ dept.name }}</td>
+                                    <td class="px-6 py-4">{{ dept.code || '-' }}</td>
+                                    <td class="px-6 py-4">{{ dept.level }}</td>
+                                    <td class="px-6 py-4">{{ dept.salary_min }} - {{ dept.salary_max }}</td>
+                                    <td class="px-6 py-4">{{ dept.description || '-' }}</td>
+                                    <td class="px-6 py-4 text-right flex justify-end gap-2">
+                                        <Button variant="ghost" size="icon" title="Khôi phục" @click="restorePosition(dept.id)">
+                                            <RotateCcw class="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" title="Xóa vĩnh viễn" @click="forceDeletePosition(dept.id)">
+                                            <Trash2 class="h-4 w-4" />
+                                        </Button>
+                                    </td>
+                                </tr>
+                                <tr v-if="restore?.length === 0">
                                     <td colspan="6" class="px-6 py-4 text-center text-muted-foreground">Không tìm thấy chức vụ nào.</td>
                                 </tr>
                             </tbody>
@@ -178,11 +222,11 @@ const deletePosition = (id: number) => {
                 <CardFooter>
                     <div class="flex items-center justify-between w-full">
                         <div class="text-sm text-muted-foreground">
-                            Hiển thị {{ positions.data.length }} trên {{ positions.total }} kết quả
+                            Hiển thị {{ positions?.data?.length || 0 }} trên {{ positions?.total || 0 }} kết quả
                         </div>
                         <div class="flex gap-2">
                             <Link 
-                                v-for="link in positions.links" 
+                                v-for="link in positions?.links" 
                                 :key="link.label" 
                                 :href="link.url || '#'"
                                 :class="['px-4 py-2 rounded-md border text-sm', 

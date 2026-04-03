@@ -45,6 +45,7 @@ interface PaginatedDepartments {
 // Ví dụ: Khi người dùng bấm nút tìm kiếm, bạn có thể truyền processing: true để giao diện hiện cái vòng xoay (Spinner)
 const props = defineProps<{
     departments: PaginatedDepartments; // Thay vì Department[]
+    restore: Department[];
     processing?: boolean;
 }>();
 
@@ -105,6 +106,24 @@ const deleteDepartment = (id: number) => {
         router.delete(`/departments/${id}`);
     }
 };
+
+const viewingRestore = ref(false);
+
+const toggleRestoreView = () => {
+    viewingRestore.value = !viewingRestore.value;
+};
+
+const restoreDepartment = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn khôi phục phòng ban này không?')) {
+        router.put(`/departments/${id}/restore`);
+    }
+};
+
+const forceDeleteDepartment = (id: number) => {
+    if (confirm('Dữ liệu sẽ bị xóa vĩnh viễn và không thể khôi phục. Bạn có chắc chắn?')) {
+        router.delete(`/departments/${id}/force-delete`);
+    }
+};
 </script>
 
 <template>
@@ -129,11 +148,16 @@ const deleteDepartment = (id: number) => {
                             />
                         </div>
 
-                        <Link href="/departments/create">
-                            <Button class="gap-2">
-                                <Plus class="h-4 w-4" /> Thêm mới
+                        <div class="flex gap-2">
+                            <Button @click="toggleRestoreView" :variant="viewingRestore ? 'secondary' : 'outline'" class="gap-2">
+                                <Trash2 class="h-4 w-4" /> {{ viewingRestore ? 'Trở lại' : 'Thùng rác' }}
                             </Button>
-                        </Link>
+                            <Link href="/departments/create">
+                                <Button class="gap-2">
+                                    <Plus class="h-4 w-4" /> Thêm mới
+                                </Button>
+                            </Link>
+                        </div>
                 </div>
             </div>
         </div>
@@ -159,8 +183,9 @@ const deleteDepartment = (id: number) => {
             </Transition>
             <Card>
                 <CardHeader class="px-6 py-4">
-                    <CardTitle>Dữ liệu phòng ban</CardTitle>
-                    <CardDescription>Hiển thị tổng cộng {{ departments.total }} phòng ban.</CardDescription>
+                    <CardTitle>{{ viewingRestore ? 'Thùng rác phòng ban' : 'Dữ liệu phòng ban' }}</CardTitle>
+                    <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ departments.total }} phòng ban.</CardDescription>
+                    <CardDescription v-else>Hiển thị danh sách phòng ban đã xóa mềm lưu trong thùng rác.</CardDescription>
                 </CardHeader>
                 <CardContent class="p-0">
                     <div class="overflow-x-auto">
@@ -169,14 +194,18 @@ const deleteDepartment = (id: number) => {
                                 <tr class="bg-muted/50 transition-colors">
                                     <th class="h-12 w-[80px] border-b px-6 text-left align-middle font-medium text-muted-foreground">ID</th>
                                     <th class="h-12 border-b px-6 text-left align-middle font-medium text-muted-foreground">Tên Phòng Ban</th>
+                                    <th class="h-12 border-b px-6 text-left align-middle font-medium text-muted-foreground">Phòng Ban Cha</th>
+                                    <th class="h-12 border-b px-6 text-left align-middle font-medium text-muted-foreground">Trưởng Phòng</th>
                                     <th class="h-12 border-b px-6 text-left align-middle font-medium text-muted-foreground">Mô tả</th>
                                     <th class="h-12 border-b px-6 text-left align-middle font-medium text-muted-foreground">Thao tác</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y">
+                            <tbody v-if="!viewingRestore" class="divide-y">
                                 <tr v-for="dept in departments.data" :key="dept.id" class="transition-colors hover:bg-muted/30">
                                     <td class="px-6 py-4 align-middle font-mono text-xs text-muted-foreground">#{{ dept.id }}</td>
                                     <td class="px-6 py-4 align-middle font-semibold text-foreground">{{ dept.name }}</td>
+                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.parent_id || 'Chưa cập nhật' }}</td>
+                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.manager_id || 'Chưa cập nhật' }}</td>
                                     <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.description || 'Chưa cập nhật' }}</td>
                                     
                                     <td class="px-6 py-4 align-middle">
@@ -204,15 +233,44 @@ const deleteDepartment = (id: number) => {
                                 </tr>
 
                                 <tr v-if="departments.data.length === 0">
-                                    <td colspan="4" class="h-24 text-center text-muted-foreground">
+                                    <td colspan="6" class="h-24 text-center text-muted-foreground">
                                         Không tìm thấy dữ liệu phòng ban nào.
+                                    </td>
+                                </tr>
+                            </tbody>
+
+                            <tbody v-else class="divide-y bg-red-50/10">
+                                <tr v-for="dept in restore" :key="dept.id" class="transition-colors hover:bg-muted/30 opacity-80">
+                                    <td class="px-6 py-4 align-middle font-mono text-xs text-muted-foreground">#{{ dept.id }}</td>
+                                    <td class="px-6 py-4 align-middle font-semibold text-foreground">{{ dept.name }}</td>
+                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.parent_id || 'Chưa cập nhật' }}</td>
+                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.manager_id || 'Chưa cập nhật' }}</td>
+                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.description || 'Chưa cập nhật' }}</td>
+                                    
+                                    <td class="px-6 py-4 align-middle">
+                                        <div class="flex justify-left gap-2">
+                                            <Button @click="restoreDepartment(dept.id)" variant="outline" size="sm" class="h-8 gap-1 border-green-500 text-green-600 hover:bg-green-50">
+                                                <span class="hidden md:inline">Khôi phục</span>
+                                            </Button>
+
+                                            <Button @click="forceDeleteDepartment(dept.id)" variant="destructive" size="sm" class="h-8 gap-1">
+                                                <Trash2 class="h-3.5 w-3.5" />
+                                                <span class="hidden md:inline">Xóa vĩnh viễn</span>
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr v-if="restore.length === 0">
+                                    <td colspan="6" class="h-24 text-center text-muted-foreground">
+                                        Thùng rác trống.
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </CardContent>
-                <CardFooter class="border-t px-6 py-4">
+                <CardFooter v-if="!viewingRestore" class="border-t px-6 py-4">
                     <div class="flex w-full items-center justify-between">
                         <div class="text-xs text-muted-foreground">
                             Hiển thị {{ departments.data.length }} trên tổng số {{ departments.total }} kết quả

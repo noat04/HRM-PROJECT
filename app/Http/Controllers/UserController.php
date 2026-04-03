@@ -4,21 +4,21 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\Laravel\Facades\Image;
 use Illuminate\Support\Facades\Hash; 
 use Illuminate\Support\Facades\DB;   
 use App\Models\User;
 use Spatie\Permission\Models\Role;   
 use Inertia\Inertia;
-// 👇 BẮT BUỘC THÊM DÒNG NÀY ĐỂ XÓA CACHE
 use Spatie\Permission\PermissionRegistrar; 
+
+// ĐÃ XÓA TOÀN BỘ IMPORT CỦA INTERVENTION IMAGE
 
 class UserController extends Controller
 {
     public function index(Request $request) 
     {
-        // 👇 Thêm ->withTrashed() để lấy cả dữ liệu đã xóa mềm
-        $query = User::with('roles')->withTrashed();
+        $restore = User::with('roles')->onlyTrashed()->get();
+        $query = User::with('roles');
     
         if ($request->has('search') && $request->search != '') {
             $query->where('name', 'like', "%{$request->search}%")
@@ -27,6 +27,7 @@ class UserController extends Controller
 
         return Inertia::render('Users/Index', [
             'users' => $query->paginate(10)->withQueryString(),
+            'restore' => $restore,
             'filters' => $request->only(['search'])
         ]);
     }
@@ -42,19 +43,12 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        // 1. ĐÃ FIX LỖI VALIDATION SẠCH SẼ
         $validated = $request->validate([
             'name'     => 'required|string|max:255|unique:users,name',
             'email'    => 'required|string|max:255|unique:users,email',
-            'password' => 'required|string|min:8|max:255', // TUYỆT ĐỐI KHÔNG ĐỂ UNIQUE PASSWORD
+            'password' => 'required|string|min:8|max:255', 
             'avatar'   => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'role_ids' => 'nullable|array', // Phải khai báo để hệ thống nhận diện mảng
-        ], [
-            'password.required' => 'Mật khẩu không được để trống.',
-            'password.min'      => 'Mật khẩu phải có ít nhất 8 ký tự.',
-            'avatar.image'      => 'Ảnh đại diện phải là file ảnh.',
-            'name.required'     => 'Tên không được để trống.',
-            'email.unique'      => 'Email đã tồn tại.',
+            'role_ids' => 'nullable|array', 
         ]); 
 
         DB::transaction(function () use ($request, $validated) {
@@ -67,33 +61,28 @@ class UserController extends Controller
                 'password' => $validated['password'],
             ]);
 
+            // 🔥 SỬ DỤNG UPLOAD GỐC CỦA LARAVEL
             if ($request->hasFile('avatar')) {
                 $file = $request->file('avatar');
-                $filename = time() . '_user_' . $user->id . '.jpg';
-                $directory = storage_path('app/public/avatars');
-                $path = $directory . '/' . $filename;
-
-                if (!file_exists($directory)) {
-                    mkdir($directory, 0755, true);
-                }
-
-                Image::read($file)->cover(256, 256)->toJpeg(80)->save($path);
-                $user->update(['avatar' => 'avatars/' . $filename]);
+                // Lấy đuôi file gốc (vd: .jpg, .png)
+                $extension = $file->getClientOriginalExtension();
+                $filename = time() . '_user_' . $user->id . '.' . $extension;
+                
+                // Laravel tự động lưu vào storage/app/public/avatars
+                $path = $file->storeAs('avatars', $filename, 'public');
+                
+                $user->update(['avatar' => $path]);
             }
 
-            // 🔥 BÍ KÍP TỐI THƯỢNG: ÉP LƯU QUYỀN BẰNG ELOQUENT THUẦN (BỎ QUA SPATIE)
             $roleIds = $request->input('role_ids', []);
-            // Ép kiểu tất cả về mảng số nguyên để tránh lỗi
             $roleIds = is_array($roleIds) ? $roleIds : [$roleIds]; 
             $cleanRoleIds = array_filter($roleIds, fn($val) => !is_null($val) && $val !== '');
             
             if (!empty($cleanRoleIds)) {
-                // Dùng thẳng quan hệ roles() để chọc thẳng ID vào bảng model_has_roles
                 $user->roles()->sync($cleanRoleIds);
             }
         });
 
-        // Xóa Cache của Spatie để nó không bị ngáo
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return redirect()->route('users.index')->with('success', 'Tuyệt vời! Đã thêm người dùng thành công.');
@@ -114,11 +103,10 @@ class UserController extends Controller
 
     public function update(Request $request, User $user) 
     {
-        // 1. ĐÃ FIX LỖI VALIDATION SẠCH SẼ
         $validated = $request->validate([
             'name'     => 'required|string|max:255|unique:users,name,' . $user->id,
             'email'    => 'required|string|max:255|unique:users,email,' . $user->id,
-            'password' => 'nullable|string|min:8|max:255', // Khi sửa thì pass có thể để trống
+            'password' => 'nullable|string|min:8|max:255', 
             'avatar'   => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
             'role_ids' => 'nullable|array', 
         ]); 
@@ -131,27 +119,23 @@ class UserController extends Controller
                 $validated['password'] = Hash::make($validated['password']);
             }
 
+            // 🔥 SỬ DỤNG UPLOAD GỐC CỦA LARAVEL
             if ($request->hasFile('avatar')) {
+                // Xóa ảnh cũ nếu có
                 if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
                     Storage::disk('public')->delete($user->avatar);
                 }
 
                 $file = $request->file('avatar');
-                $filename = time() . '_user_' . $user->id . '.jpg';
-                $directory = storage_path('app/public/avatars');
-                $path = $directory . '/' . $filename;
-
-                if (!file_exists($directory)) {
-                    mkdir($directory, 0755, true);
-                }
-
-                Image::read($file)->cover(256, 256)->toJpeg(80)->save($path);
-                $validated['avatar'] = 'avatars/' . $filename;
+                $extension = $file->getClientOriginalExtension();
+                $filename = time() . '_user_' . $user->id . '.' . $extension;
+                
+                $path = $file->storeAs('avatars', $filename, 'public');
+                $validated['avatar'] = $path;
             }
 
             $user->update($validated);
 
-            // 🔥 BÍ KÍP TỐI THƯỢNG: ÉP LƯU QUYỀN BẰNG ELOQUENT THUẦN (BỎ QUA SPATIE)
             $roleIds = $request->input('role_ids', []);
             $roleIds = is_array($roleIds) ? $roleIds : [$roleIds]; 
             $cleanRoleIds = array_filter($roleIds, fn($val) => !is_null($val) && $val !== '');
@@ -160,7 +144,6 @@ class UserController extends Controller
 
         });
 
-        // Xóa Cache của Spatie
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return redirect()->route('users.index')->with('success', 'Tuyệt vời! Đã cập nhật người dùng thành công.');
@@ -171,7 +154,8 @@ class UserController extends Controller
         if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
             Storage::disk('public')->delete($user->avatar);
         }
-        
+        $user->status = 'inactive';
+        $user->save();
         $user->delete();
         return redirect()->route('users.index')->with('success', 'Tuyệt vời! Đã xóa người dùng thành công.');
     }
@@ -192,23 +176,31 @@ class UserController extends Controller
     {
         $user = User::withTrashed()->findOrFail($id);
         $user->restore();
+        $user->status = 'active';
+        $user->save();
         return redirect()->route('users.index')->with('success', 'Tuyệt vời! Đã khôi phục người dùng thành công.');
     }
 
-    // Hàm cập nhật trạng thái (Active/Inactive)
     public function updateStatus(Request $request, User $user) 
     {
-        // Kiểm tra dữ liệu gửi lên chỉ được phép là 'active' hoặc 'inactive'
         $validated = $request->validate([
             'status' => 'required|in:active,inactive',
         ]);
 
-        // Cập nhật trạng thái
         $user->update([
             'status' => $validated['status']
         ]);
 
-        // Trả về trang cũ kèm thông báo
         return back()->with('success', 'Tuyệt vời! Đã cập nhật trạng thái tài khoản.');
     }
+    public function forceDelete($id)
+    {
+        $user = User::withTrashed()->findOrFail($id);
+        if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+            Storage::disk('public')->delete($user->avatar);
+        }
+        $user->forceDelete();
+        return redirect()->route('users.index')->with('success', 'Tuyệt vời! Đã xóa vĩnh viễn người dùng thành công.');
+    }
+
 }

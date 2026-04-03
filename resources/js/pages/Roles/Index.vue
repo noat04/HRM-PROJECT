@@ -9,18 +9,33 @@ import type { BreadcrumbItem } from '@/types';
 import { computed, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
-// 👇 ĐÃ SỬA LỖI ESLINT: Chỉ cần gọi defineProps, không cần gán vào biến 'const props ='
 const props = defineProps<{
-    roles: Array<{
+    // Đã cấu trúc lại thành Pagination Object
+    roles: {
+        data: Array<{
+            id: number;
+            name: string;
+            display_name: string;
+            description: string;
+            permissions: Array<{ name: string }>;
+            deleted_at?: string | null; 
+        }>;
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+        total: number;
+    },
+    // restore giữ nguyên vì vẫn là Array (từ ->get() ở backend)
+    restore: Array<{
         id: number;
         name: string;
         display_name: string;
         description: string;
-        permissions: Array<{
-            name: string;
-        }>;
+        permissions: Array<{ name: string }>;
         deleted_at?: string | null; 
-    }>;
+    }>,
+    permissions: Array<{
+        id: number;
+        name: string;
+    }>,
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -47,10 +62,22 @@ const deleteRole = (id: number) => {
         router.delete(`/roles/${id}`);
     }
 };
-// 👇 Hàm gọi khôi phục dữ liệu
+
+const viewingRestore = ref(false);
+
+const toggleRestoreView = () => {
+    viewingRestore.value = !viewingRestore.value;
+};
+
 const restoreRole = (id: number) => {
-    if (confirm('Bạn có chắc chắn muốn khôi phục vai trò này?')) {
-        router.put(`/roles/${id}/restore`); // Gọi đúng ID truyền vào
+    if (confirm('Bạn có chắc chắn muốn khôi phục vai trò này không?')) {
+        router.put(`/roles/${id}/restore`);
+    }
+};
+
+const forceDeleteRole = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn xóa vĩnh viễn vai trò này không?')) {
+        router.delete(`/roles/${id}/force-delete`);
     }
 };
 </script>
@@ -66,12 +93,18 @@ const restoreRole = (id: number) => {
                     <h1 class="text-2xl font-bold tracking-tight">Quản lý Vai trò</h1>
                     <p class="text-muted-foreground">Danh sách các vai trò và phân quyền trong hệ thống.</p>
                 </div>
-                <Link href="/roles/create">
-                    <Button>
-                        <Plus class="mr-2 h-4 w-4" />
-                        Tạo Vai trò mới
+                 <div class="flex gap-2">
+                    <Button @click="toggleRestoreView" :variant="viewingRestore ? 'default' : 'outline'">
+                        <Trash2 class="h-4 w-4 mr-2" />
+                        {{ viewingRestore ? 'Đóng thùng rác' : 'Thùng rác' }}
                     </Button>
-                </Link>
+                    <Link href="/roles/create">
+                        <Button>
+                            <Plus class="mr-2 h-4 w-4" />
+                            Tạo Vai trò mới
+                        </Button>
+                    </Link>
+                 </div>
             </div>
             
             <Transition
@@ -95,10 +128,9 @@ const restoreRole = (id: number) => {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Danh sách Vai trò</CardTitle>
-                    <CardDescription>
-                        Tổng số vai trò: {{ roles.length }}
-                    </CardDescription>
+                    <CardTitle>{{ viewingRestore ? 'Thùng rác vai trò' : 'Dữ liệu vai trò' }}</CardTitle>
+                    <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ roles?.data?.length || 0 }} vai trò.</CardDescription>
+                    <CardDescription v-else>Hiển thị danh sách vai trò đã xóa mềm lưu trong thùng rác.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div class="overflow-x-auto">
@@ -111,8 +143,9 @@ const restoreRole = (id: number) => {
                                     <th class="text-right py-3 px-4 font-medium">Hành động</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                <tr v-for="role in roles" :key="role.id" class="border-b hover:bg-muted/50">
+
+                            <tbody v-if="!viewingRestore" class="divide-y">
+                                <tr v-for="role in (roles.data || [])" :key="role.id" class="border-b hover:bg-muted/50">
                                     <td class="py-3 px-4">
                                         <div class="font-semibold text-primary">{{ role.display_name }}</div>
                                         <div class="text-xs text-muted-foreground">{{ role.name }}</div>
@@ -120,43 +153,107 @@ const restoreRole = (id: number) => {
                                     <td class="py-3 px-4 text-muted-foreground">{{ role.description || 'N/A' }}</td>
                                     <td class="py-3 px-4">
                                         <div class="flex flex-wrap gap-1">
-                                            <Badge v-for="perm in role.permissions" :key="perm.name" variant="secondary">
+                                            <Badge v-for="perm in (role.permissions || [])" :key="perm.name" variant="secondary">
                                                 {{ perm.name }}
                                             </Badge>
-                                            <span v-if="role.permissions.length === 0" class="text-xs text-muted-foreground">Chưa có quyền</span>
+                                            <span v-if="!role.permissions?.length" class="text-xs text-muted-foreground">Chưa có quyền</span>
                                         </div>
                                     </td>
-                                    
                                     <td class="py-3 px-4 text-right">
-    <div v-if="role.deleted_at" class="flex items-center justify-end gap-2">
-        <span class="text-xs text-red-500 font-semibold mr-2">Đã xóa</span>
-        <Button @click="restoreRole(role.id)" variant="outline" class="text-emerald-600 border-emerald-600 hover:bg-emerald-50">
-            Khôi phục
-        </Button>
-    </div>
-
-    <div v-else class="flex justify-end gap-2">
-        <Link :href="`/roles/${role.id}`">
-            <Button variant="ghost" size="icon" title="Xem chi tiết">
-                <Eye class="h-4 w-4" />
-            </Button>
-        </Link>
-        <Link :href="`/roles/${role.id}/edit`">
-            <Button variant="ghost" size="icon" title="Chỉnh sửa">
-                <Edit class="h-4 w-4" />
-            </Button>
-        </Link>
-        <Button variant="ghost" size="icon" title="Xóa" @click="deleteRole(role.id)">
-            <Trash2 class="h-4 w-4" />
-        </Button>
-    </div>
-</td>
+                                        <div class="flex justify-end gap-2">
+                                            <Link :href="`/roles/${role.id}`">
+                                                <Button variant="ghost" size="icon" title="Xem chi tiết">
+                                                    <Eye class="h-4 w-4" />
+                                                </Button>
+                                            </Link>
+                                            <Link :href="`/roles/${role.id}/edit`">
+                                                <Button variant="ghost" size="icon" title="Chỉnh sửa">
+                                                    <Edit class="h-4 w-4" />
+                                                </Button>
+                                            </Link>
+                                            <Button variant="ghost" size="icon" title="Xóa" @click="deleteRole(role.id)">
+                                                <Trash2 class="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="!roles?.data?.length">
+                                    <td colspan="4" class="text-center py-6 text-muted-foreground italic">Không có dữ liệu vai trò nào.</td>
                                 </tr>
                             </tbody>
+
+                            <tbody v-else class="divide-y">
+                                <tr v-for="role in (restore || [])" :key="role.id" class="border-b hover:bg-muted/50">
+                                    <td class="py-3 px-4">
+                                        <div class="font-semibold text-primary">{{ role.display_name }}</div>
+                                        <div class="text-xs text-muted-foreground">{{ role.name }}</div>
+                                    </td>
+                                    <td class="py-3 px-4 text-muted-foreground">{{ role.description || 'N/A' }}</td>
+                                    <td class="py-3 px-4">
+                                        <div class="flex flex-wrap gap-1">
+                                            <Badge v-for="perm in (role.permissions || [])" :key="perm.name" variant="secondary">
+                                                {{ perm.name }}
+                                            </Badge>
+                                            <span v-if="!role.permissions?.length" class="text-xs text-muted-foreground">Chưa có quyền</span>
+                                        </div>
+                                    </td>
+                                    <td class="py-3 px-4 text-right">
+                                        <div class="flex justify-end gap-2">
+                                            <Button 
+                                                variant="outline" 
+                                                class="text-emerald-600 border-emerald-600 hover:bg-emerald-50" 
+                                                @click="restoreRole(role.id)"
+                                            >
+                                                Khôi phục
+                                            </Button>
+                                            <Button 
+                                                variant="destructive" 
+                                                @click="forceDeleteRole(role.id)"
+                                            >
+                                                Xóa vĩnh viễn
+                                            </Button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="!restore?.length">
+                                    <td colspan="4" class="text-center py-6 text-muted-foreground italic">Thùng rác trống.</td>
+                                </tr>
+                            </tbody>
+
                         </table>
                     </div>
                 </CardContent>
+                 <CardFooter class="border-t bg-gray-50/50 px-6 py-4">
+                    <div class="flex items-center justify-between w-full">
+                        <div class="text-sm text-gray-500">
+                            Hiển thị <span class="font-medium text-gray-900">{{ roles?.data?.length || 0 }}</span> trên tổng số <span class="font-medium text-gray-900">{{ roles?.total || 0 }}</span> kết quả
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <template v-for="(link, index) in roles?.links" :key="index">
+                                <Button
+                                    v-if="link.url"
+                                    @click="router.get(link.url, {}, { preserveState: true })"
+                                    :variant="link.active ? 'default' : 'outline'"
+                                    size="sm"
+                                    class="min-w-8 shadow-sm"
+                                >
+                                    <span v-html="link.label"></span>
+                                </Button>
+                                <Button
+                                    v-else
+                                    variant="outline"
+                                    size="sm"
+                                    disabled
+                                    class="min-w-8 opacity-50"
+                                >
+                                    <span v-html="link.label"></span>
+                                </Button>
+                            </template>
+                        </div>
+                    </div>
+                </CardFooter>
             </Card>
 
-        </div> </AppLayout>
+        </div> 
+    </AppLayout>
 </template>

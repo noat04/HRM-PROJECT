@@ -1,28 +1,24 @@
 import { usePage } from '@inertiajs/vue3';
 
 export function usePermission() {
-    const hasRole = (role: string | string[]) => {
-        // Lấy dữ liệu roles từ backend gửi sang (Mặc định là mảng rỗng nếu không có)
-        const rawRoles = (usePage().props.auth as any)?.roles || [];
-        
-        // BƯỚC XỬ LÝ THÔNG MINH: 
-        // Ép tất cả về dạng mảng chuỗi (String Array), bất kể backend gửi Object hay String
-        const userRoles = rawRoles.map((r: any) => typeof r === 'string' ? r : r.name);
+    const page = usePage();
 
-        // Kiểm tra
-        if (Array.isArray(role)) {
-            return role.some(r => userRoles.includes(r));
+    const hasRole = (roles: string | string[]) => {
+        const userRoles = (page.props.auth as any).roles || [];
+        if (Array.isArray(roles)) {
+            return roles.some((role) => userRoles.includes(role));
         }
-        return userRoles.includes(role);
+        return userRoles.includes(roles);
     };
 
-    const hasPermission = (permission: string | string[]) => {
-        const rawPermissions = (usePage().props.auth as any)?.permissions || [];
-        const userPermissions = rawPermissions.map((p: any) => typeof p === 'string' ? p : p.name);
-
-        if (Array.isArray(permission)) {
-            return permission.some(p => userPermissions.includes(p));
+    const hasPermission = (permission: string) => {
+        // 👇 1. SUPER ADMIN LUÔN LUÔN ĐƯỢC PASS QUA MỌI CỬA (Bypass)
+        if (hasRole('Final Admin')) {
+            return true;
         }
+
+        // 👇 2. Nếu không phải Super Admin, kiểm tra quyền cụ thể trong mảng permissions
+        const userPermissions = (page.props.auth as any).permissions || [];
         return userPermissions.includes(permission);
     };
 

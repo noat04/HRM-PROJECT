@@ -5,10 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Position;
 use Inertia\Inertia;
-
+use App\Http\Requests\Crud\Position\PositionRequest;
 class PositionController extends Controller
 {
     public function index(Request $request){
+        $restore = Position::onlyTrashed()->get();
         $query = Position::query();
 
         if($request->has('search') && $request->search != '') {
@@ -17,6 +18,7 @@ class PositionController extends Controller
 
         return Inertia::render('Positions/Index', [
             'positions' => $query->paginate(3)->withQueryString(),
+            'restore' => $restore,  
             'filters' => $request->only(['search'])
         ]);
 
@@ -26,24 +28,8 @@ class PositionController extends Controller
         return Inertia::render('Positions/Create');
     }
 
-    public function store(Request $request) {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:positions,name',
-            'description' => 'nullable|string',
-            'code'=> 'nullable|string|unique:positions,code',
-            'level'=> 'required|integer',
-            'salary_min' => 'nullable|numeric',
-            'salary_max' => 'nullable|numeric',
-        ], [
-            'name.required' => 'Vui lòng nhập tên chức vụ.',
-            'name.unique' => 'Tên chức vụ này đã tồn tại! Vui lòng chọn tên khác.',
-            'code.unique' => 'Mã chức vụ này đã tồn tại! Vui lòng chọn mã khác.',
-            'code.required' => 'Vui lòng nhập mã chức vụ.',
-            'description.required' => 'Vui lòng nhập mô tả chức vụ.',
-            'level.required' => 'Vui lòng nhập cấp bậc.',
-            'salary_min.required' => 'Vui lòng nhập mức lương tối thiểu.',
-            'salary_max.required' => 'Vui lòng nhập mức lương tối đa.',
-        ]);
+    public function store(PositionRequest $request) {
+        $validated = $request->validated();
         Position::create($validated);
         return redirect()->route('positions.index')->with('success', 'Tuyệt vời! Đã thêm chức vụ thành công.');
     }
@@ -54,27 +40,11 @@ class PositionController extends Controller
         ]);
     }
 
-    public function update(Request $request, $id) {
+    public function update(PositionRequest $request, $id) {
         $position = Position::findOrFail($id);
-        $validated = $request->validate([
-            'name' => 'required|string|max:255|unique:positions,name,' . $id,
-            'description' => 'nullable|string',
-            'code'=> 'nullable|string|unique:positions,code,' . $id,
-            'level'=> 'required|integer',
-            'salary_min' => 'nullable|numeric',
-            'salary_max' => 'nullable|numeric',
-        ], [
-            'name.required' => 'Vui lòng nhập tên chức vụ.',
-            'name.unique' => 'Tên chức vụ này đã tồn tại! Vui lòng chọn tên khác.',
-            'code.unique' => 'Mã chức vụ này đã tồn tại! Vui lòng chọn mã khác.',
-            'code.required' => 'Vui lòng nhập mã chức vụ.',
-            'description.required' => 'Vui lòng nhập mô tả chức vụ.',
-            'level.required' => 'Vui lòng nhập cấp bậc.',
-            'salary_min.required' => 'Vui lòng nhập mức lương tối thiểu.',
-            'salary_max.required' => 'Vui lòng nhập mức lương tối đa.',
-        ]);
+        $validated = $request->validated();
         $position->update($validated);
-        return redirect()->route('positions.index')->with('success', 'Tuyệt vời! Đã cập nhật chức vụ thành công.');
+        return redirect()->route('positions.index')->with('success', 'Tuyệt vời! Đã thêm chức vụ thành công.');
     }
 
     public function destroy($id) {
@@ -102,6 +72,18 @@ class PositionController extends Controller
             // Bắt lỗi Database (ví dụ: đang có nhân viên tham chiếu đến ID phòng ban này)
             return redirect()->back()->with('error', 'Lỗi hệ thống: ' . $e->getMessage());
         }
+    }
+
+    public function restore($id) {
+        $position = Position::withTrashed()->findOrFail($id);
+        $position->restore();
+        return redirect()->back()->with('success', 'Tuyệt vời! Đã khôi phục chức vụ thành công.');
+    }
+
+    public function forceDelete($id) {
+        $position = Position::withTrashed()->findOrFail($id);
+        $position->forceDelete();
+        return redirect()->back()->with('success', 'Tuyệt vời! Đã xóa chức vụ thành công.');
     }
     
 }

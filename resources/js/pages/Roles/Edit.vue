@@ -9,6 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, Save } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
+// 👇 Import thêm computed
+import { computed } from 'vue';
 
 const props = defineProps<{
     role: {
@@ -16,16 +18,21 @@ const props = defineProps<{
         name: string;
         display_name: string;
         description: string;
-        permissions: number[]; // Mảng ID các quyền hiện tại
+        permissions: number[]; 
     };
-    permissions: Array<{ id: number; name: string }>;
+    // 👇 Cập nhật type để nhận thêm group và deleted_at từ Backend
+    permissions: Array<{ 
+        id: number; 
+        name: string; 
+        group: string; 
+        deleted_at?: string | null 
+    }>;
 }>();
 
 const form = useForm({
     name: props.role.name,
     display_name: props.role.display_name,
     description: props.role.description,
-    // Đảm bảo luôn là mảng (Array)
     permission_ids: props.role.permissions || [], 
 });
 
@@ -35,6 +42,22 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Chỉnh sửa', href: `/roles/${props.role.id}/edit` },
 ];
 
+// 🔥 THUẬT TOÁN GOM NHÓM QUYỀN HẠN
+const groupedPermissions = computed(() => {
+    const groups: Record<string, typeof props.permissions> = {};
+    
+    // Lặp qua mảng permissions phẳng và nhét vào từng object theo tên group
+    (props.permissions || []).forEach(perm => {
+        const groupName = perm.group || 'Khác'; // Nếu không có nhóm thì cho vào nhóm 'Khác'
+        if (!groups[groupName]) {
+            groups[groupName] = [];
+        }
+        groups[groupName].push(perm);
+    });
+    
+    return groups;
+});
+
 const handleCheckboxChange = (checked: boolean, id: number) => {
     const numId = Number(id);
 
@@ -42,10 +65,10 @@ const handleCheckboxChange = (checked: boolean, id: number) => {
         ? [...new Set([...form.permission_ids, numId])]
         : form.permission_ids.filter(pId => pId !== numId);
 };
+
 const submit = () => {
     form.transform((data) => ({
         ...data,
-        // Ép dữ liệu permission_ids thành mảng thuần túy (loại bỏ proxy của Vue)
         permission_ids: Array.from(data.permission_ids)
     })).put(`/roles/${props.role.id}`, {
         preserveScroll: true,
@@ -80,15 +103,18 @@ const submit = () => {
                             <div>
                                 <Label for="name">Tên vai trò (slug)</Label>
                                 <Input id="name" v-model="form.name" required class="mt-1" />
+                                <div v-if="form.errors.name" class="text-red-500 text-sm mt-1">{{ form.errors.name }}</div>
                             </div>
                             <div>
                                 <Label for="display_name">Hiển thị</Label>
                                 <Input id="display_name" v-model="form.display_name" required class="mt-1" />
+                                <div v-if="form.errors.display_name" class="text-red-500 text-sm mt-1">{{ form.errors.display_name }}</div>
                             </div>
                         </div>
                         <div>
                             <Label for="description">Mô tả</Label>
                             <Textarea id="description" v-model="form.description" class="mt-1" rows="3" />
+                            <div v-if="form.errors.description" class="text-red-500 text-sm mt-1">{{ form.errors.description }}</div>
                         </div>
                     </CardContent>
                 </Card>
@@ -96,32 +122,49 @@ const submit = () => {
                 <Card>
                     <CardHeader>
                         <CardTitle>Danh sách quyền hạn</CardTitle>
-                        <CardDescription>Chọn các quyền cho vai trò này.</CardDescription>
+                        <CardDescription>Các quyền bị khóa (chữ đỏ) là những quyền đã bị xóa mềm, không thể cấp mới.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                            <div v-for="perm in permissions" :key="perm.id" class="flex items-center space-x-2">
-                                <Checkbox
-                                    :id="`perm-${perm.id}`"
-                                    :modelValue="form.permission_ids.includes(Number(perm.id))"
-                                    @update:modelValue="(val: boolean | 'indeterminate') => handleCheckboxChange(val === true, perm.id)"
-                                />
-                                <Label :for="`perm-${perm.id}`" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                    {{ perm.name }}
-                                </Label>
+                    <CardContent class="space-y-8">
+                        
+                        <div v-for="(perms, groupName) in groupedPermissions" :key="groupName">
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-muted-foreground border-b pb-2 mb-4">
+                                Phân hệ: {{ groupName }}
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pl-2">
+                                <div 
+                                    v-for="perm in perms" 
+                                    :key="perm.id" 
+                                    class="flex items-start space-x-2"
+                                    :class="{ 'opacity-60': perm.deleted_at }" 
+                                >
+                                    <Checkbox
+                                        :id="`perm-${perm.id}`"
+                                        :modelValue="form.permission_ids.includes(Number(perm.id))"
+                                        @update:modelValue="(val: boolean | 'indeterminate') => handleCheckboxChange(val === true, perm.id)"
+                                        :disabled="!!perm.deleted_at"
+                                        class="mt-1"
+                                    />
+                                    <Label 
+                                        :for="`perm-${perm.id}`" 
+                                        class="text-sm font-medium leading-none cursor-pointer"
+                                        :class="{ 'cursor-not-allowed': perm.deleted_at }"
+                                    >
+                                        {{ perm.name }}
+                                        <div v-if="perm.deleted_at" class="text-xs text-red-500 italic mt-1">
+                                            (Đã khóa)
+                                        </div>
+                                    </Label>
+                                </div>
                             </div>
                         </div>
+
                     </CardContent>
                 </Card>
 
-                <div class="p-4 mt-4 bg-gray-900 text-green-400 rounded text-sm font-mono">
-                    <p>Dữ liệu chuẩn bị gửi lên Server:</p>
-                    {{ form.permission_ids }}
-                </div>
-
                 <div class="flex justify-end gap-2">
                     <Link href="/roles">
-                        <Button variant="outline">Hủy</Button>
+                        <Button variant="outline" type="button">Hủy</Button>
                     </Link>
                     <Button type="submit" :disabled="form.processing">
                         <Save class="h-4 w-4 mr-2" />

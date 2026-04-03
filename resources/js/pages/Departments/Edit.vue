@@ -6,7 +6,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
+import { watch } from 'vue';
 
+interface Employee {
+    id: number;
+    full_name: string;
+}
 // Nhận dữ liệu phòng ban từ Controller truyền sang
 const props = defineProps<{
     department: {
@@ -16,8 +21,10 @@ const props = defineProps<{
         manager_id: number | null;
         description: string;
         level: number;
-    }
+    },
+    employees: Employee[];
 }>();
+
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Phòng ban', href: '/departments' },
@@ -72,12 +79,21 @@ const submitForm = () => {
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div class="space-y-2">
-                                <label class="text-sm font-medium">ID Quản lý</label>
-                                <input v-model="form.manager_id" type="number" class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm" />
+                                <label class="text-sm font-medium">Phòng ban cha</label>
+                                <input v-model="form.parent_id" type="number" class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm" disabled />
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-medium">Cấp bậc</label>
-                                <input v-model="form.level" type="number" class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm" required />
+                                <input v-model="form.level" type="number" class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm" disabled />
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-sm font-medium">ID Quản lý</label>
+                                <select v-model="form.manager_id" class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm">
+                                    <option :value="null">Không chọn</option>
+                                    <option v-for="employee in employees" :key="employee.id" :value="employee.id">
+                                        {{ employee.full_name }} (ID: {{ employee.id }})
+                                    </option>
+                                </select>
                             </div>
                         </div>
 

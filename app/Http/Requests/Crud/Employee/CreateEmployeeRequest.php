@@ -30,7 +30,10 @@ class CreateEmployeeRequest extends FormRequest
             'resignation_date' => 'nullable',
             'bank_account_number' => 'nullable',
             'bank_name' => 'nullable',
-            'status' => 'required',
+            'status' => [
+                'required',
+                'in:probation,official,resigned,paused',
+            ],
         ];
     }
 

@@ -5,9 +5,12 @@ import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Pencil, Trash2, Eye, Plus, Search } from 'lucide-vue-next';
+import { Pencil, Trash2, Eye, Plus, Search,RotateCcw } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 import EmployeeStatus from '@/enums/EmployeeStatus';
+import { usePermission } from '@/composables/usePermission';
+
+const { hasRole,hasPermission } = usePermission();
 // 1. KHAI BÁO ĐẦY ĐỦ CÁC INTERFACE
 interface Department {
     id: number;
@@ -51,6 +54,7 @@ const props = defineProps<{
     employees: PaginatedEmployees;
     departments: Department[];
     positions: Position[];
+    restore: Employee[];
     filters?: { search?: string };
 }>();
 
@@ -119,6 +123,24 @@ const handleDelete = (id: number) => {
         router.delete(`/employees/${id}`);
     }
 };
+
+const viewingRestore = ref(false);
+
+const toggleRestoreView = () => {
+    viewingRestore.value = !viewingRestore.value;
+};
+
+const restoreEmployee = (id: number) => {
+    if (confirm('Bạn có chắc chắn muốn khôi phục nhân viên này không?')) {
+        router.put(`/employees/${id}/restore`);
+    }
+};
+
+const forceDeleteEmployee = (id: number) => {
+    if (confirm('Dữ liệu sẽ bị xóa vĩnh viễn và không thể khôi phục. Bạn có chắc chắn?')) {
+        router.delete(`/employees/${id}/force-delete`);
+    }
+};
 </script>
 
 <template>
@@ -142,12 +164,19 @@ const handleDelete = (id: number) => {
                             class="pl-8 bg-white" 
                         />
                     </div>
-
-                    <Link href="/employees/create">
-                        <Button class="gap-2">
-                            <Plus class="h-4 w-4" /> Thêm nhân viên
+                    <div class="flex gap-2">
+                        <Button @click="toggleRestoreView" :variant="viewingRestore ? 'secondary' : 'outline'" class="gap-2">
+                            <Trash2 class="h-4 w-4" /> {{ viewingRestore ? 'Trở lại' : 'Thùng rác' }}
                         </Button>
-                    </Link>
+                         <div v-if="hasPermission('employee.create')">
+                            <Link href="/employees/create">
+                                <Button class="gap-2">
+                                    <Plus class="h-4 w-4" /> Thêm nhân viên
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                   
                 </div>
             </div>
     
@@ -172,8 +201,9 @@ const handleDelete = (id: number) => {
 
             <Card>
                 <CardHeader class="px-6 py-4 border-b bg-gray-50/50">
-                    <CardTitle>Danh sách Nhân sự</CardTitle>
-                    <CardDescription>Hiển thị tổng cộng {{ employees.total }} nhân viên.</CardDescription>
+                    <CardTitle>{{ viewingRestore ? 'Thùng rác nhân viên' : 'Dữ liệu nhân viên' }}</CardTitle>
+                    <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ employees.total }} nhân viên.</CardDescription>
+                    <CardDescription v-else>Hiển thị danh sách nhân viên đã xóa mềm lưu trong thùng rác.</CardDescription>
                 </CardHeader>
                 <CardContent class="p-0">
                     <div class="overflow-x-auto">
@@ -189,7 +219,7 @@ const handleDelete = (id: number) => {
                                     <th scope="col" class="px-6 py-3 text-right font-medium">Hành động</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y">
+                           <tbody v-if="!viewingRestore" class="divide-y">
                                 <tr v-for="employee in employees.data" :key="employee.id" class="bg-white hover:bg-gray-50 transition-colors">
                                     
                                     <td class="px-6 py-4 font-mono font-semibold text-primary">
@@ -223,19 +253,27 @@ const handleDelete = (id: number) => {
                                     
                                     <td class="px-6 py-4 text-right">
                                         <div class="flex justify-end gap-1">
-                                            <Link :href="`/employees/${employee.id}`">
-                                                <Button variant="ghost" size="icon" title="Xem hồ sơ">
-                                                    <Eye class="h-4 w-4 text-blue-600" />
-                                                </Button>
-                                            </Link>
-                                            <Link :href="`/employees/${employee.id}/edit`">
-                                                <Button variant="ghost" size="icon" title="Sửa thông tin">
-                                                    <Pencil class="h-4 w-4 text-amber-600" />
-                                                </Button>
-                                            </Link>
-                                            <Button variant="ghost" size="icon" title="Xóa nhân viên" @click="handleDelete(employee.id)">
-                                                <Trash2 class="h-4 w-4 text-red-600" />
-                                            </Button>
+                                            <!-- <div  v-if="hasPermission('manager_employees')"> -->
+                                                <div v-if="hasPermission('view_employees')">
+                                                    <Link :href="`/employees/${employee.id}`">
+                                                        <Button variant="ghost" size="icon" title="Xem hồ sơ">
+                                                            <Eye class="h-4 w-4 text-blue-600" />
+                                                        </Button>
+                                                    </Link>
+                                                </div>
+                                                <div v-if="hasPermission('update_employees')">
+                                                    <Link :href="`/employees/${employee.id}/edit`">
+                                                        <Button variant="ghost" size="icon" title="Sửa thông tin">
+                                                            <Pencil class="h-4 w-4 text-amber-600" />
+                                                        </Button>
+                                                    </Link>
+                                                </div>
+                                                <div v-if="hasPermission('delete_employees')">
+                                                    <Button variant="ghost" size="icon" title="Xóa nhân viên" @click="handleDelete(employee.id)">
+                                                        <Trash2 class="h-4 w-4 text-red-600" />
+                                                    </Button>
+                                                </div>
+                                            <!-- </div> -->
                                         </div>
                                     </td>
                                 </tr>
@@ -245,6 +283,54 @@ const handleDelete = (id: number) => {
                                         <div class="flex flex-col items-center justify-center">
                                             <Search class="h-8 w-8 mb-2 opacity-30" />
                                             <p>Không tìm thấy nhân sự nào khớp với điều kiện tìm kiếm.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tbody v-else class="divide-y bg-red-50/10">
+                                <tr v-for="employee in restore" :key="employee.id" class="bg-white hover:bg-gray-50 transition-colors">
+                                    
+                                    <td class="px-6 py-4 font-mono font-semibold text-primary">
+                                        {{ employee.employee_code }}
+                                    </td>
+                                    
+                                    <td class="px-6 py-4 font-medium text-gray-900">
+                                        {{ employee.full_name }}
+                                    </td>
+                                    
+                                    <td class="px-6 py-4 text-muted-foreground">
+                                        {{ getDepartmentName(employee.department_id) }}
+                                    </td>
+                                    
+                                    <td class="px-6 py-4 text-muted-foreground">
+                                        {{ getPositionName(employee.position_id) }}
+                                    </td>
+
+                                    <td class="px-6 py-4 text-muted-foreground">
+                                        {{ getGenderLabel(employee.gender) }}
+                                    </td>
+                                    
+                                    <td class="px-6 py-4">
+                                        <span 
+                                            class="px-2.5 py-1 rounded-full text-xs border"
+                                            :class="getStatusClass(employee.status)"
+                                        >
+                                            {{ getStatusLabel(employee.status) }}
+                                        </span>
+                                    </td>
+                                    
+                                    <td class="px-6 py-4 text-right">
+                                        <div class="flex items-center justify-end gap-2">
+                                            <!-- <div v-if="hasPermission('employee.update')"> -->
+                                                <Button variant="ghost" size="icon" title="Khôi phục" @click="restoreEmployee(employee.id)">
+                                                    <RotateCcw class="h-4 w-4 text-blue-600" />
+                                                </Button>
+                                            <!-- </div>
+                                            <div v-if="hasPermission('employee.delete')"> -->
+                                                <Button variant="ghost" size="icon" title="Xóa vĩnh viễn" @click="forceDeleteEmployee(employee.id)">
+                                                    <Trash2 class="h-4 w-4 text-red-600" />
+                                                </Button>
+                                            <!-- </div> -->
                                         </div>
                                     </td>
                                 </tr>

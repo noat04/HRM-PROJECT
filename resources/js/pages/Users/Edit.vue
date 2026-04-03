@@ -4,8 +4,8 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Spinner } from '@/components/ui/spinner';
-import { Checkbox } from '@/components/ui/checkbox'; // 👇 Import Checkbox
-import { Label } from '@/components/ui/label';       // 👇 Import Label
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { ArrowLeft } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 import { ref } from 'vue';
@@ -15,6 +15,7 @@ interface Role {
     id: number;
     name: string;
     display_name: string;
+    deleted_at?: string | null;
 }
 
 interface User {
@@ -23,7 +24,7 @@ interface User {
     email: string;
     avatar: string | null;
     status: string;
-    role_ids: number[]; // 👇 Thêm mảng ID vai trò
+    role_ids: number[];
     created_at: EpochTimeStamp;
     updated_at: EpochTimeStamp;
     deleted_at?: EpochTimeStamp;
@@ -31,7 +32,7 @@ interface User {
 
 const props = defineProps<{
     user: User;
-    roles: Role[]; // 👇 Nhận danh sách vai trò từ backend
+    roles: Role[];
     processing?: boolean;
 }>();
 
@@ -40,36 +41,29 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Chỉnh sửa', href: `/users/${props.user.id}/edit` },
 ];
 
-// 1. Tạo biến hiển thị ảnh xem trước
 const avatarPreview = ref(
     props.user.avatar 
     ? `/storage/${props.user.avatar}` 
     : `https://ui-avatars.com/api/?name=${props.user.name}&background=random`
 );
 
-// 2. Khởi tạo form
 const form = useForm({
     name: props.user.name,
     email: props.user.email,
-    password: '', // 👇 Để trống, không lấy password cũ lên
+    password: '', 
     avatar: null as File | null,
     status: props.user.status,
-    role_ids: props.user.role_ids || [], // 👇 Load sẵn các quyền user đang có
-    
-    // TUYỆT CHIÊU CỦA LARAVEL: Ép dùng PUT qua đường POST để gửi được File
+    role_ids: props.user.role_ids || [], 
     _method: 'PUT', 
 });
 
-// 3. Hàm xử lý submit
 const submitForm = () => {
-    // Dùng transform để ép mảng proxy thành array thuần cho role_ids
     form.transform((data) => ({
         ...data,
         role_ids: Array.from(data.role_ids)
     })).post(`/users/${props.user.id}`);
 };
 
-// 4. Hàm xử lý chọn ảnh mới
 const handleAvatarChange = (event: Event) => {
     const target = event.target as HTMLInputElement;
     if (target && target.files && target.files.length > 0) {
@@ -84,7 +78,6 @@ const handleAvatarChange = (event: Event) => {
     }
 };
 
-// 5. Hàm xử lý checkbox quyền
 const handleRoleChange = (checked: boolean, id: number) => {
     const numId = Number(id);
     if (checked) {
@@ -181,16 +174,31 @@ const handleRoleChange = (checked: boolean, id: number) => {
                             <p class="text-sm text-muted-foreground mb-4">Sửa đổi các chức danh và quyền hạn của người dùng này.</p>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border rounded-md p-4 bg-gray-50/50">
-                                <div v-for="role in (roles || [])" :key="role.id" class="flex items-center space-x-2">
+                                <div 
+                                    v-for="role in (roles || [])" 
+                                    :key="role.id" 
+                                    class="flex items-start space-x-2"
+                                    :class="{ 'opacity-60': role.deleted_at }" 
+                                >
                                     <Checkbox
-    :id="`role-${role.id}`"
-    :modelValue="form.role_ids.includes(Number(role.id))"
-    @update:modelValue="(val: boolean | 'indeterminate') => handleRoleChange(val === true, role.id)"
-/>
-                                    <Label :for="`role-${role.id}`" class="text-sm font-medium leading-none cursor-pointer">
-                                        {{ role.display_name || role.name }}
+                                        :id="`role-${role.id}`"
+                                        :modelValue="form.role_ids.includes(Number(role.id))"
+                                        @update:modelValue="(val: boolean | 'indeterminate') => handleRoleChange(val === true, role.id)"
+                                        :disabled="!!role.deleted_at"
+                                        class="mt-1"
+                                    />
+                                    <Label 
+                                        :for="`role-${role.id}`" 
+                                        class="text-sm font-medium leading-none cursor-pointer"
+                                        :class="{ 'cursor-not-allowed': role.deleted_at }"
+                                    >
+                                        {{ role.name }}
+                                        <div v-if="role.deleted_at" class="text-xs text-red-500 italic mt-1">
+                                            (Đã khóa)
+                                        </div>
                                     </Label>
                                 </div>
+
                                 <div v-if="!roles || roles.length === 0" class="text-sm text-gray-500 italic col-span-full">
                                     Chưa có vai trò nào trong hệ thống.
                                 </div>
@@ -221,9 +229,10 @@ const handleRoleChange = (checked: boolean, id: number) => {
                         </div>
                     </form>
                 </CardContent>
-                    <div class="bg-black text-green-400 p-2 rounded mt-2">
-                        {{ form.role_ids }}
-                    </div>
+                
+                <div class="bg-black text-green-400 p-2 rounded mt-2 mx-6 mb-6">
+                    Mảng Vai trò đang chọn: {{ form.role_ids }}
+                </div>
             </Card>
         </div>
     </AppLayout>
