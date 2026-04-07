@@ -11,11 +11,12 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 // Thêm dòng này vào
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\LogsActivityCustom;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, SoftDeletes, HasRoles;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, SoftDeletes, HasRoles, LogsActivityCustom;
     /**
      * The attributes that are mass assignable.
      *

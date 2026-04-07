@@ -12,23 +12,58 @@ use App\Models\Employee;
 class DepartmentController extends Controller
 {
     public function index(Request $request) {
-        $restore = Department::onlyTrashed()->get();
-
-        //PHƯƠNG THỨC TÌM KIẾM PHÒNG BAN
+        // 1. TẠO LUỒNG TRUY VẤN (TUYỆT ĐỐI KHÔNG DÙNG ->get() Ở ĐÂY)
         $query = Department::query();
+        $restoreQuery = Department::onlyTrashed();
 
-        // 1. Lọc dữ liệu nếu có từ khóa tìm kiếm
+        // 2. LẤY DỮ LIỆU ĐỔ VÀO BỘ LỌC (DROPDOWN) CHO VUE
+        $parent_id = Department::whereNull('parent_id')->get();
+        $manager_id = Employee::all(); // Lấy danh sách nhân viên để chọn làm quản lý
+        // Lấy danh sách các cấp bậc (level) hiện có, bỏ trùng lặp (distinct)
+        $level = Department::select('level')->whereNotNull('level')->distinct()->get(); 
+
+        // 3. LỌC THEO TỪ KHÓA TÌM KIẾM
         if ($request->has('search') && $request->search != '') {
-            $query->where('name', 'like', "%{$request->search}%");
+            $searchTerm = "%{$request->search}%";
+            
+            $query->where('name', 'like', $searchTerm);
+            $restoreQuery->where('name', 'like', $searchTerm);
         }
 
+        // 4. LỌC THEO PHÒNG BAN CHA (parent_id)
+        if ($request->filled('parent_id')) {
+            $parentArray = explode(',', $request->parent_id);
+            
+            $query->whereIn('parent_id', $parentArray);
+            $restoreQuery->whereIn('parent_id', $parentArray);
+        }
+
+        // 5. LỌC THEO QUẢN LÝ (manager_id) - Là cột trực tiếp, dùng whereIn
+        if ($request->filled('manager_id')) {
+            $managerArray = explode(',', $request->manager_id);
+            
+            $query->whereIn('manager_id', $managerArray);
+            $restoreQuery->whereIn('manager_id', $managerArray);
+        }
+
+        // 6. LỌC THEO CẤP BẬC (level) - Là cột trực tiếp, dùng whereIn
+        if ($request->filled('level')) {
+            $levelArray = explode(',', $request->level);
+            
+            $query->whereIn('level', $levelArray);
+            $restoreQuery->whereIn('level', $levelArray);
+        }
+
+        // 7. TRẢ KẾT QUẢ VỀ FRONTEND
         return Inertia::render('Departments/Index', [
-            // 2. Thêm ->withQueryString() cực kỳ quan trọng! 
-            // Nó giúp nối từ khóa tìm kiếm vào link phân trang (VD: ?search=HR&page=2)
             'departments' => $query->paginate(10)->withQueryString(),
-            'restore' => $restore,
-            // 3. Trả về từ khóa hiện tại để hiển thị lại trên ô Input của giao diện
-            'filters' => $request->only(['search'])
+            // 👇 GỌI ->get() Ở BƯỚC CUỐI CÙNG CHO THÙNG RÁC
+            'restore' => ['data' => $restoreQuery->latest()->get()], 
+            'filters' => $request->only(['search','parent_id','manager_id','level']),
+            'parent_id' => $parent_id,
+            'manager_id' => $manager_id,
+            'level' => $level,
+            'is_trashed' => $request->is_trashed === 'true' ? 'true' : 'false'
         ]);
     }
 
@@ -136,5 +171,29 @@ class DepartmentController extends Controller
         $department = Department::withTrashed()->findOrFail($id);
         $department->forceDelete();
         return redirect()->back()->with('success', 'Tuyệt vời! Đã xóa vĩnh viễn phòng ban thành công.');
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'integer|exists:departments,id', 
+        ]);
+
+        Department::whereIn('id', $request->ids)->delete();
+
+        return back()->with('success', 'Tuyệt vời! Đã xóa thành công ' . count($request->ids) . ' phòng ban.');
+    }
+
+    public function bulkRestore(Request $request)
+    {
+        $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'integer|exists:departments,id', 
+        ]);
+
+        Department::whereIn('id', $request->ids)->restore();
+
+        return back()->with('success', 'Tuyệt vời! Đã khôi phục thành công ' . count($request->ids) . ' phòng ban.');
     }
 }

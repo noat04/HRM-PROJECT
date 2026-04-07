@@ -6,8 +6,9 @@ import { computed,ref,watch } from 'vue'; // 👇 Import computed của Vue
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription ,CardFooter} from '@/components/ui/card';
-import { Pencil, Trash2, Eye, Plus,Search } from 'lucide-vue-next';
+import {RefreshCw,Pencil, Trash2, Eye, Plus,Search } from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
+import { Filter } from '@/components/ui/filter';
 
 interface Department {
     id: number;
@@ -18,6 +19,12 @@ interface Department {
     level: number;
     create_at: EpochTimeStamp;
     updated_at: EpochTimeStamp;
+}
+interface Employee {
+    id: number;
+    name: string;
+    manager_id: number;
+
 }
 
 
@@ -30,7 +37,7 @@ interface PaginatedDepartments {
     current_page: number;
     total: number;
     per_page: number;
-    filters?: { search?: string }; // Nhận từ khóa tìm kiếm
+    filters?: { search?: string ,parent_id?: string,manager_id?: string,level?: string}; // Nhận từ khóa tìm kiếm
     // 👇 Thêm dòng này để nhận danh sách nút bấm từ Laravel
     links: { url: string | null; label: string; active: boolean }[]; 
 }
@@ -45,8 +52,20 @@ interface PaginatedDepartments {
 // Ví dụ: Khi người dùng bấm nút tìm kiếm, bạn có thể truyền processing: true để giao diện hiện cái vòng xoay (Spinner)
 const props = defineProps<{
     departments: PaginatedDepartments; // Thay vì Department[]
-    restore: Department[];
+    restore: { data: Department[] };
     processing?: boolean;
+    filters: {
+        search: string;
+        parent_id: string;
+        manager_id: string;
+        level: string;
+    };
+   is_trashed?: string; 
+    
+    // 👇 ĐỔI THÀNH `any` ĐỂ CHẤP NHẬN CẢ ARRAY LẪN OBJECT
+    parent_id?: any;
+    manager_id?: any;
+    level?: any;
 }>();
 
 
@@ -54,29 +73,44 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Phòng ban', href: '/departments' },
 ];
 
+
+const isRefreshing = ref(false);
+
+const refreshData = () => {
+    router.reload({
+        only: ['departments'], // Tối ưu: Chỉ gọi API để lấy mới đúng mảng users, bỏ qua các dữ liệu khác
+        onStart: () => {
+            isRefreshing.value = true; // Bắt đầu xoay icon
+        },
+        onFinish: () => {
+            isRefreshing.value = false; // Dừng xoay icon
+        }
+    });
+};
+
 // ==========================================
 // LOGIC TÌM KIẾM (SEARCH)
 // ==========================================
 // Khởi tạo biến search bằng từ khóa cũ (nếu có)
-const search = ref(props.departments?.filters?.search || '');
+// const search = ref(props.departments?.filters?.search || '');
 
-let searchTimeout: ReturnType<typeof setTimeout>;
+// let searchTimeout: ReturnType<typeof setTimeout>;
 
-// Lắng nghe mỗi khi ô tìm kiếm thay đổi
-watch(search, (value) => {
-    clearTimeout(searchTimeout);
+// // Lắng nghe mỗi khi ô tìm kiếm thay đổi
+// watch(search, (value) => {
+//     clearTimeout(searchTimeout);
     
-    // Đợi 300ms (0.3 giây) sau khi ngừng gõ mới bắt đầu tìm kiếm
-    searchTimeout = setTimeout(() => {
-        router.get('/departments', 
-            { search: value }, // Gửi tham số search lên server (tự động đưa về trang 1)
-            { 
-                preserveState: true, // Giữ nguyên trạng thái trang (không giật lag)
-                replace: true        // Không lưu vào lịch sử back của trình duyệt cho mỗi phím gõ
-            }
-        );
-    }, 300);
-});
+//     // Đợi 300ms (0.3 giây) sau khi ngừng gõ mới bắt đầu tìm kiếm
+//     searchTimeout = setTimeout(() => {
+//         router.get('/departments', 
+//             { search: value }, // Gửi tham số search lên server (tự động đưa về trang 1)
+//             { 
+//                 preserveState: true, // Giữ nguyên trạng thái trang (không giật lag)
+//                 replace: true        // Không lưu vào lịch sử back của trình duyệt cho mỗi phím gõ
+//             }
+//         );
+//     }, 300);
+// });
 
 // ==========================================
 // LOGIC XỬ LÝ THÔNG BÁO FLASH MESSAGE
@@ -107,11 +141,11 @@ const deleteDepartment = (id: number) => {
     }
 };
 
-const viewingRestore = ref(false);
+// const viewingRestore = ref(false);
 
-const toggleRestoreView = () => {
-    viewingRestore.value = !viewingRestore.value;
-};
+// const toggleRestoreView = () => {
+//     viewingRestore.value = !viewingRestore.value;
+// };
 
 const restoreDepartment = (id: number) => {
     if (confirm('Bạn có chắc chắn muốn khôi phục phòng ban này không?')) {
@@ -124,6 +158,164 @@ const forceDeleteDepartment = (id: number) => {
         router.delete(`/departments/${id}/force-delete`);
     }
 };
+
+// 👇 ĐÃ SỬA: Đọc trạng thái từ URL để giữ nguyên tab Thùng rác khi F5
+const viewingRestore = ref(props.is_trashed === 'true');
+
+const toggleRestoreView = () => {
+    filters.value.is_trashed = !filters.value.is_trashed;
+    viewingRestore.value = filters.value.is_trashed; 
+    selectedIds.value = [];
+};
+
+const selectedIds = ref<number[]>([]);
+
+// 👇 ĐÃ SỬA: Tính toán nút Checkbox All cho cả 2 bảng
+const isAllSelected = computed(() => {
+    const dataSource = viewingRestore.value ? props.restore.data : props.departments.data;
+    return dataSource.length > 0 && selectedIds.value.length === dataSource.length;
+});
+
+// 👇 ĐÃ SỬA: Hàm Checkbox All hoạt động trên cả 2 bảng
+const toggleSelectAll = (event: Event) => {
+    const isChecked = (event.target as HTMLInputElement).checked;
+    const dataSource = viewingRestore.value ? props.restore.data : props.departments.data;
+    
+    if (isChecked) {
+        selectedIds.value = dataSource.map((dept: any) => dept.id);
+    } else {
+        selectedIds.value = [];
+    }
+};
+
+const toggleSelectUser = (userId: number) => {
+    const index = selectedIds.value.indexOf(userId);
+    if (index > -1) {
+        selectedIds.value.splice(index, 1);
+    } else {
+        selectedIds.value.push(userId);
+    }
+};
+
+// 5. Hàm gửi yêu cầu xóa hàng loạt
+const bulkDeleteSelected = () => {
+    if (selectedIds.value.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 phòng ban để xóa.');
+        return;
+    }
+
+    if (confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.value.length} phòng ban này không?`)) {
+        router.delete('/departments/bulk-delete', {
+            data: { ids: selectedIds.value },
+            preserveState: true,
+            onSuccess: () => {
+                // Reset lại trạng thái sau khi xóa thành công
+                selectedIds.value = [];
+            }
+        });
+    }
+};
+
+const bulkRestoreSelected = () => {
+    if (selectedIds.value.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 phòng ban để khôi phục.');
+        return;
+    }
+
+    if (confirm(`Bạn có chắc chắn muốn khôi phục ${selectedIds.value.length} phòng ban này không?`)) {
+        router.put('/departments/bulk-restore', 
+            // Tham số thứ 2: Dữ liệu (Payload) gửi lên Backend
+            { 
+                ids: selectedIds.value 
+            }, 
+            // Tham số thứ 3: Cấu hình của Inertia (Options)
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    selectedIds.value = [];
+                }
+            }
+        );
+    }
+};
+
+
+// ==========================================
+// LOGIC FILTER (TÍCH CHỌN NHIỀU)
+// ==========================================
+// 👇 1. TẠO HÀM CHUYỂN ĐỔI AN TOÀN
+const formatOptions = (data: any) => {
+    if (!data) return [];
+    
+    // Nếu Laravel gửi sang một Object, Object.values() sẽ ép nó về Array chuẩn
+    const safeArray = Array.isArray(data) ? data : Object.values(data);
+    
+    // Map an toàn trên Array
+    return safeArray.map((item: any) => ({ 
+        label: item.name || `ID: ${item.id}`, // Hiển thị tên (nếu có), không có thì hiện ID
+        value: item.id 
+    }));
+};
+
+// 👇 2. CẬP NHẬT LẠI CẤU HÌNH FILTER
+// 👇 2. CẬP NHẬT LẠI CẤU HÌNH FILTER
+const filterConfig = [
+    {
+        key: 'search',
+        type: 'text' as const,
+        placeholder: 'Tìm kiếm phòng ban...',
+    },
+    {
+        key: 'parent_id',
+        // 👇 ĐÃ SỬA: Đổi từ 'select' thành 'multi-checkbox'
+        type: 'multi-checkbox' as const, 
+        placeholder: 'Phòng ban cha',
+        options: formatOptions(props.parent_id)
+    },
+    {
+        key: 'manager_id',
+        // 👇 ĐÃ SỬA: Đổi từ 'select' thành 'multi-checkbox'
+        type: 'multi-checkbox' as const, 
+        placeholder: 'Quản lý',
+        options: formatOptions(props.manager_id)
+    },
+   {
+        key: 'level',
+        type: 'multi-checkbox' as const,
+        placeholder: 'Cấp bậc',
+        // 👇 ĐÃ SỬA: Map trực tiếp để lấy đúng trường 'level' thay vì 'id'
+        options: props.level ? (Array.isArray(props.level) ? props.level : Object.values(props.level)).map((item: any) => ({
+            label: `Cấp ${item.level}`, // Gắn thêm chữ "Cấp" cho đẹp (VD: Cấp 1, Cấp 2)
+            value: item.level           // Giá trị thực tế gửi lên server
+        })) : []
+    }
+];
+
+// 1. Thêm is_trashed vào filters để URL cũng nhớ trạng thái thùng rác
+const filters = ref({
+    search: props.filters?.search || '',
+    parent_id: props.filters?.parent_id ? props.filters.parent_id.split(',') : [],
+    manager_id: props.filters?.manager_id ? props.filters.manager_id.split(',') : [],
+    level: props.filters?.level ? props.filters.level.split(',') : [],
+    is_trashed: props.is_trashed === 'true' // Đọc từ Props
+});
+
+// 3. Trong cái Watch của filters, nhớ gài thêm is_trashed vào object gửi lên
+watch(filters, (newFilters) => {
+    router.get('/departments', {
+        search: newFilters.search,
+        parent_id: newFilters.parent_id.join(','), 
+        manager_id: newFilters.manager_id.join(','),    
+        level: newFilters.level.join(','),    
+        is_trashed: newFilters.is_trashed ? 'true' : 'false' // Gửi cờ báo hiệu lên
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+}, { deep: true });
+
+
 </script>
 
 <template>
@@ -138,7 +330,7 @@ const forceDeleteDepartment = (id: number) => {
                 </div>
     
                 <div class="flex items-center gap-4">
-                        <div class="relative w-64">
+                        <!-- <div class="relative w-64">
                             <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input 
                                 v-model="search" 
@@ -146,6 +338,16 @@ const forceDeleteDepartment = (id: number) => {
                                 placeholder="Tìm kiếm tên phòng ban..." 
                                 class="pl-8 bg-white" 
                             />
+                        </div> -->
+                        <div v-if="selectedIds.length > 0 && !viewingRestore" class="flex items-center gap-2">
+                        <Button variant="destructive" @click="bulkDeleteSelected" class="gap-2">
+                            <Trash2 class="h-4 w-4" /> Xóa {{ selectedIds.length }} người dùng
+                        </Button>
+                        </div>
+                        <div v-if="selectedIds.length > 0 && viewingRestore" class="flex items-center gap-2">
+                            <Button variant="destructive" @click="bulkRestoreSelected" class="gap-2">
+                                <Trash2 class="h-4 w-4" /> Khôi phục {{ selectedIds.length }} người dùng
+                            </Button>
                         </div>
 
                         <div class="flex gap-2">
@@ -186,12 +388,33 @@ const forceDeleteDepartment = (id: number) => {
                     <CardTitle>{{ viewingRestore ? 'Thùng rác phòng ban' : 'Dữ liệu phòng ban' }}</CardTitle>
                     <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ departments.total }} phòng ban.</CardDescription>
                     <CardDescription v-else>Hiển thị danh sách phòng ban đã xóa mềm lưu trong thùng rác.</CardDescription>
+                    <div class="flex items-center gap-2">
+                        <Filter :config="filterConfig" v-model="filters" />
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            @click="refreshData" 
+                            :disabled="isRefreshing"
+                            title="Làm mới dữ liệu"
+                            class="bg-white"
+                        >
+                            <RefreshCw class="h-4 w-4 text-gray-600" :class="{ 'animate-spin text-blue-600': isRefreshing }" />
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent class="p-0">
                     <div class="overflow-x-auto">
                         <table class="w-full border-collapse text-sm">
                             <thead>
                                 <tr class="bg-muted/50 transition-colors">
+                                    <th class="h-12 w-[50px] border-b px-6 text-left align-middle font-medium text-muted-foreground">
+                                        <input 
+                                            type="checkbox" 
+                                            :checked="isAllSelected" 
+                                            @change="toggleSelectAll" 
+                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                    </th>
                                     <th class="h-12 w-[80px] border-b px-6 text-left align-middle font-medium text-muted-foreground">ID</th>
                                     <th class="h-12 border-b px-6 text-left align-middle font-medium text-muted-foreground">Tên Phòng Ban</th>
                                     <th class="h-12 border-b px-6 text-left align-middle font-medium text-muted-foreground">Phòng Ban Cha</th>
@@ -202,6 +425,14 @@ const forceDeleteDepartment = (id: number) => {
                             </thead>
                             <tbody v-if="!viewingRestore" class="divide-y">
                                 <tr v-for="dept in departments.data" :key="dept.id" class="transition-colors hover:bg-muted/30">
+                                    <td class="px-6 py-4 align-middle font-mono text-xs text-muted-foreground">
+                                        <input 
+                                            type="checkbox" 
+                                            :value="dept.id" 
+                                            v-model="selectedIds" 
+                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                    </td>
                                     <td class="px-6 py-4 align-middle font-mono text-xs text-muted-foreground">#{{ dept.id }}</td>
                                     <td class="px-6 py-4 align-middle font-semibold text-foreground">{{ dept.name }}</td>
                                     <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.parent_id || 'Chưa cập nhật' }}</td>
@@ -239,34 +470,44 @@ const forceDeleteDepartment = (id: number) => {
                                 </tr>
                             </tbody>
 
-                            <tbody v-else class="divide-y bg-red-50/10">
-                                <tr v-for="dept in restore" :key="dept.id" class="transition-colors hover:bg-muted/30 opacity-80">
-                                    <td class="px-6 py-4 align-middle font-mono text-xs text-muted-foreground">#{{ dept.id }}</td>
-                                    <td class="px-6 py-4 align-middle font-semibold text-foreground">{{ dept.name }}</td>
-                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.parent_id || 'Chưa cập nhật' }}</td>
-                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.manager_id || 'Chưa cập nhật' }}</td>
-                                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.description || 'Chưa cập nhật' }}</td>
-                                    
-                                    <td class="px-6 py-4 align-middle">
-                                        <div class="flex justify-left gap-2">
-                                            <Button @click="restoreDepartment(dept.id)" variant="outline" size="sm" class="h-8 gap-1 border-green-500 text-green-600 hover:bg-green-50">
-                                                <span class="hidden md:inline">Khôi phục</span>
-                                            </Button>
+                            <tbody v-else-if="viewingRestore && restore.data.length > 0" class="divide-y bg-red-50/10">
+                <tr v-for="dept in restore.data" :key="dept.id" class="transition-colors hover:bg-muted/30 opacity-80">
+                    <td class="px-6 py-4 align-middle font-mono text-xs text-muted-foreground">
+                        <input 
+                            type="checkbox" 
+                            :value="dept.id" 
+                            v-model="selectedIds" 
+                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                    </td>
+                    <td class="px-6 py-4 align-middle font-mono text-xs text-muted-foreground">#{{ dept.id }}</td>
+                    <td class="px-6 py-4 align-middle font-semibold text-foreground">{{ dept.name }}</td>
+                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.parent_id || 'Chưa cập nhật' }}</td>
+                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.manager_id || 'Chưa cập nhật' }}</td>
+                    <td class="px-6 py-4 align-middle text-muted-foreground">{{ dept.description || 'Chưa cập nhật' }}</td>
+                    
+                    <td class="px-6 py-4 align-middle">
+                        <div class="flex justify-left gap-2">
+                            <Button @click="restoreDepartment(dept.id)" variant="outline" size="sm" class="h-8 gap-1 border-green-500 text-green-600 hover:bg-green-50">
+                                <span class="hidden md:inline">Khôi phục</span>
+                            </Button>
 
-                                            <Button @click="forceDeleteDepartment(dept.id)" variant="destructive" size="sm" class="h-8 gap-1">
-                                                <Trash2 class="h-3.5 w-3.5" />
-                                                <span class="hidden md:inline">Xóa vĩnh viễn</span>
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-
-                                <tr v-if="restore.length === 0">
-                                    <td colspan="6" class="h-24 text-center text-muted-foreground">
-                                        Thùng rác trống.
-                                    </td>
-                                </tr>
-                            </tbody>
+                            <Button @click="forceDeleteDepartment(dept.id)" variant="destructive" size="sm" class="h-8 gap-1">
+                                <Trash2 class="h-3.5 w-3.5" />
+                                <span class="hidden md:inline">Xóa vĩnh viễn</span>
+                            </Button>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+            
+            <tbody v-else-if="viewingRestore && (!restore.data || restore.data.length === 0)">
+                <tr>
+                    <td colspan="7" class="h-24 text-center text-muted-foreground">
+                        Thùng rác trống.
+                    </td>
+                </tr>
+            </tbody>
                         </table>
                     </div>
                 </CardContent>

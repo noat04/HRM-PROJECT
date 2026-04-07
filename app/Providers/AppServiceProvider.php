@@ -28,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(function ($user, $ability) {
             // Nếu là Super Admin, trả về true (Cho phép làm mọi việc)
             // LƯU Ý: Phải kiểm tra đúng tên Role trong Database của bạn nhé
-            return $user->hasRole('Super Admin') ? true : null;
+            return $user->hasRole('Final Admin') ? true : null;
         });
         $this->configureDefaults();
     }

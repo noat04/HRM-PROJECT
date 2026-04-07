@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Traits\LogsActivityCustom;
 
 class Department extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, LogsActivityCustom;
 
     protected $fillable = ['name', 'parent_id', 'manager_id', 'description', 'level'];
 

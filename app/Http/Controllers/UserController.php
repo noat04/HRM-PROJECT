@@ -17,18 +17,56 @@ class UserController extends Controller
 {
     public function index(Request $request) 
     {
-        $restore = User::with('roles')->onlyTrashed()->get();
-        $query = User::with('roles');
-    
+        // 1. Tạo 2 luồng truy vấn (Query Builder) TÁCH BIỆT
+        $query = User::with('roles')->whereNull('deleted_at'); // Bảng chính
+        $restoreQuery = User::with('roles')->onlyTrashed();    // Bảng thùng rác
+        $roles = Role::all();
+
+        // 2. LỌC THEO TỪ KHÓA TÌM KIẾM
         if ($request->has('search') && $request->search != '') {
-            $query->where('name', 'like', "%{$request->search}%")
-                  ->orWhere('email', 'like', "%{$request->search}%");
+            $searchTerm = "%{$request->search}%";
+            
+            // Lọc cho bảng chính
+            $query->where(function($q) use ($searchTerm) {
+                $q->where('name', 'like', $searchTerm)
+                  ->orWhere('email', 'like', $searchTerm);
+            });
+            
+            // Lọc cho bảng thùng rác
+            $restoreQuery->where(function($q) use ($searchTerm) {
+                $q->where('name', 'like', $searchTerm)
+                  ->orWhere('email', 'like', $searchTerm);
+            });
         }
 
+        // 3. LỌC THEO NHIỀU TRẠNG THÁI (Tick Checkbox)
+        if ($request->filled('status')) {
+            $statusArray = explode(',', $request->status);
+            
+            $query->whereIn('status', $statusArray);
+            $restoreQuery->whereIn('status', $statusArray);
+        }
+
+        // 4. LỌC THEO NHIỀU VAI TRÒ (Tick Checkbox)
+        if ($request->filled('role')) {
+            $roleArray = explode(',', $request->role);
+            
+            // Closure (hàm ẩn danh) để lọc vai trò, dùng chung cho cả 2
+            $roleFilter = function($q) use ($roleArray) {
+                $q->whereIn('roles.id', $roleArray); 
+            };
+
+            $query->whereHas('roles', $roleFilter);
+            $restoreQuery->whereHas('roles', $roleFilter);
+        }
+
+        // 5. Trả kết quả về cho Vue
         return Inertia::render('Users/Index', [
-            'users' => $query->paginate(10)->withQueryString(),
-            'restore' => $restore,
-            'filters' => $request->only(['search'])
+            'users' => $query->latest()->paginate(10)->withQueryString(),
+            'restore' => $restoreQuery->latest()->get(), // Nhớ gọi ->get() ở bước cuối cùng
+            'roles' => $roles,
+            'filters' => $request->only(['search', 'status', 'role']),
+            'is_trashed' => $request->is_trashed === 'true' ? 'true' : 'false'
         ]);
     }
 
@@ -201,6 +239,59 @@ class UserController extends Controller
         }
         $user->forceDelete();
         return redirect()->route('users.index')->with('success', 'Tuyệt vời! Đã xóa vĩnh viễn người dùng thành công.');
+    }
+
+    public function bulkDelete(Request $request)
+    {
+        // Kiểm tra xem có gửi mảng ids lên không
+        $request->validate([
+            'ids'   => 'required|array',
+            // 👇 ĐÃ SỬA: Đổi employees thành users
+            'ids.*' => 'integer|exists:users,id', 
+        ]);
+
+        // Tránh trường hợp Admin tự "chém" chính mình
+        $filteredIds = array_filter($request->ids, function($id) {
+            return $id !== auth()->id();
+        });
+
+        if (empty($filteredIds)) {
+            return back()->with('error', 'Không thể xóa tài khoản bạn đang đăng nhập!');
+        }
+
+        // Đảm bảo xóa ảnh đại diện trong Storage (Nếu có)
+        $usersToDelete = User::whereIn('id', $filteredIds)->get();
+        foreach ($usersToDelete as $user) {
+            if ($user->avatar && Storage::disk('public')->exists($user->avatar)) {
+                Storage::disk('public')->delete($user->avatar);
+            }
+        }
+
+        // Thực thi xóa hàng loạt bằng 1 câu Query duy nhất
+        User::whereIn('id', $filteredIds)->delete();
+
+        return back()->with('success', 'Tuyệt vời! Đã xóa thành công ' . count($filteredIds) . ' người dùng.');
+    }
+
+    public function bulkRestore(Request $request)
+    {
+        $request->validate([
+            'ids'   => 'required|array',
+            'ids.*' => 'integer|exists:users,id',
+        ]);
+
+        $restoredCount = 0;
+        foreach ($request->ids as $id) {
+            $user = User::withTrashed()->find($id);
+            if ($user) {
+                $user->restore();
+                $user->status = 'active';
+                $user->save();
+                $restoredCount++;
+            }
+        }
+
+        return back()->with('success', "Tuyệt vời! Đã khôi phục thành công {$restoredCount} người dùng.");
     }
 
 }

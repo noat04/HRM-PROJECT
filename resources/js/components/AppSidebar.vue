@@ -37,45 +37,98 @@ const mainNavItems = computed(() => {
             title: 'Hệ thống',
             icon: Shield,
             // Chỉ hiện thư mục này nếu có ít nhất 1 trong các quyền dưới
-            show: hasPermission('manager_users') || hasPermission('manager_roles') || hasPermission('manager_permissions'),
+            show: hasPermission('system_manage_users') || hasPermission('system_manage_roles') || hasPermission('system_manage_permission'),
             items: [
-                { title: 'Người dùng', href: '/users', show: hasPermission('manager_users') },
-                { title: 'Vai trò', href: '/roles', show: hasPermission('manager_roles') },
-                { title: 'Quyền hạn', href: '/permissions', show: hasPermission('manager_permissions') },
+                { title: 'Người dùng', href: '/users', show: hasPermission('system_manage_users') },
+                { title: 'Vai trò', href: '/roles', show: hasPermission('system_manage_roles') },
+                { title: 'Quyền hạn', href: '/permissions', show: hasPermission('system_manage_permission') },
             ]
         },
         {
             title: 'Tổ chức & Nhân sự',
             icon: Users,
-            show: hasPermission('manager_departments') || hasPermission('manager_positions') || hasPermission('manager_employees'),
+            show: hasPermission('department_manage') || hasPermission('position_manage') || hasPermission('employee_view_all'),
             items: [
-                { title: 'Phòng ban', href: '/departments', show: hasPermission('manager_departments') },
-                { title: 'Chức vụ', href: '/positions', show: hasPermission('manager_positions') },
-                { title: 'Hồ sơ nhân viên', href: '/employees', show: hasPermission('manager_employees') },
+                { title: 'Phòng ban', href: '/departments', show: hasPermission('department_manage') },
+                { title: 'Chức vụ', href: '/positions', show: hasPermission('position_manage') },
+                { title: 'Hồ sơ nhân viên', href: '/employees', show: hasPermission('employee_view_all') },
             ]
         },
         {
             title: 'Thời gian & Nghỉ phép',
             icon: CalendarDays,
-            show: hasPermission('manager_shifts') || hasPermission('manager_leave_types') || hasPermission('manager_leave_balances') || hasPermission('manager_leave_requests'),
+            show: hasPermission('shift_manage') || hasPermission('leave_type_manage') || hasPermission('leave_balance_adjust') || hasPermission('attendance_manage'),
             items: [
-                { title: 'Ca làm việc', href: '/shifts', show: hasPermission('manager_shifts') },
-                { title: 'Loại phép', href: '/leaves/types', show: hasPermission('manager_leave_types') },
-                { title: 'Số dư phép', href: '/leaves/balances', show: hasPermission('manager_leave_balances') },
-                { title: 'Đơn xin nghỉ', href: '/leaves/requests', show: hasPermission('manager_leave_requests') },
+                { title: 'Ca làm việc', href: '/shifts', show: hasPermission('shift_manage') },
+                { title: 'Loại phép', href: '/leaves/types', show: hasPermission('leave_type_manage') },
+                { title: 'Số dư phép', href: '/leaves/balances', show: hasPermission('leave_balance_adjust') },
+                // { title: 'Đơn xin nghỉ', href: '/leaves/requests', show: hasPermission('manager_leave_requests') },
             ]
         },
         {
             title: 'Tiền lương (C&B)',
             icon: Banknote,
-            show: hasPermission('view_salary_structures') || hasPermission('view_payslips') || hasPermission('view_payroll_periods'),
+            show: hasPermission('salary_component_manage') || hasPermission('salary_structure_view') || hasPermission('payroll_period_manage') || hasPermission('payslip_view_all'),
             items: [
-                { title: 'Phiếu lương', href: '/payslips', show: hasPermission('view_payslips') },
-                { title: 'Kỳ lương', href: '/payroll-periods', show: hasPermission('view_payroll_periods') },
-                { title: 'Cơ cấu lương', href: '/salary-structures', show: hasPermission('view_salary_structures') },
-                { title: 'Thành phần lương', href: '/salary-components', show: hasPermission('view_salary_components') },
+                { title: 'Phiếu lương', href: '/payslips', show: hasPermission('payslip_view_all') },
+                { title: 'Kỳ lương', href: '/payroll-periods', show: hasPermission('payroll_period_manage') },
+                { title: 'Cơ cấu lương', href: '/salary-structures', show: hasPermission('salary_structure_view') },
+                { title: 'Thành phần lương', href: '/salary-components', show: hasPermission('salary_component_manage') },
             ]
-        }
+        },
+        {
+            title: 'Quản lý nhóm',
+            icon: Users,
+            show: hasPermission('employee_view_team'),
+            items: [
+                { title: 'Nhóm', href: '/groups', show: hasPermission('employee_view_team') },
+            ]
+        },
+        {
+            title: 'Phê duyệt nghỉ phép',
+            icon: Users,
+            show: hasPermission('leave_request_approve'),
+            items: [
+                { title: 'Phê duyệt nghỉ phép', href: '/leave-requests', show: hasPermission('leave_request_approve') },
+            ]
+        },
+        {
+            title: 'Quản lý chấm công nhóm',
+            icon: Users,
+            show: hasPermission('attendance_approve_ot') || hasPermission('attendance_view_team') ,
+            items: [
+                { title: 'Phê duyệt OT', href: '/leave-requests', show: hasPermission('attendance_approve_ot') },
+                { title: 'Báo cáo đi muộn/về sớm', href: '/attendance', show: hasPermission('attendance_view_team') },
+            ]
+        },
+        {
+            title: 'Hồ sơ cá nhân',
+            icon: Users,
+            show: hasPermission('profile_view_own') ,
+            href: '/profile'
+        },
+        {
+            title: 'Chấm công',
+            icon: Users,
+            show: hasPermission('attendance_check_in') ,
+            href: '/attendance'
+        },
+        {
+            title: 'Bảng Lương',
+            icon: Users,
+            show: hasPermission('payslip_view_own') ,
+            href: '/payslips'
+        },
+
+        {
+            title: 'Nghỉ phép',
+            icon: Users,
+            show: hasPermission('leave_request_create') || hasPermission('leave_balance_view_own') ,
+            items: [
+                { title: 'Đăng ký nghỉ phép', href: '/leave-requests/create', show: hasPermission('leave_request_create') },
+                { title: 'Số dư phép', href: '/leave-balances', show: hasPermission('leave_balance_view_own') },
+            ]
+        },
     ];
 
     // 🔥 THUẬT TOÁN LỌC KÉP: Lọc thư mục cha -> Sau đó lọc các menu con bên trong

@@ -4,11 +4,12 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Plus, Edit, Trash2, Search, RotateCcw } from 'lucide-vue-next';
+// 👇 ĐÃ SỬA: Bổ sung RefreshCw
+import { Plus, Edit, Trash2, Search, RotateCcw, RefreshCw } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
+import { Filter } from '@/components/ui/filter';
 
 const props = defineProps<{
-    // Khai báo chuẩn Pagination Object cho permissions
     permissions: {
         data: Array<{
             id: number;
@@ -19,9 +20,9 @@ const props = defineProps<{
         links: Array<{ url: string | null; label: string; active: boolean }>;
         total: number;
     },
-    // Nhận filters từ Backend để hiển thị lại từ khóa tìm kiếm
     filters: {
         search?: string;
+        group?: string;
     },
     restore: {
         data: Array<{
@@ -30,7 +31,8 @@ const props = defineProps<{
             group: string;
             guard_name: string;
         }>;
-    }
+    },
+    is_trashed: string;
 }>();
 
 const breadcrumbs = [
@@ -38,22 +40,18 @@ const breadcrumbs = [
     { title: 'Danh sách', href: '#' },
 ];
 
+const isRefreshing = ref(false);
+
+const refreshData = () => {
+    router.reload({
+        only: ['permissions', 'restore'], 
+        onStart: () => { isRefreshing.value = true; },
+        onFinish: () => { isRefreshing.value = false; }
+    });
+};
+
 const page = usePage();
 const flashSuccess = computed(() => (page.props as any).flash?.success);
-
-// Logic Tìm kiếm có độ trễ (Debounce) để không gọi API liên tục
-const searchQuery = ref(props.filters.search || '');
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-watch(searchQuery, (value) => {
-    if (searchTimeout) clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        router.get('/permissions', { search: value }, {
-            preserveState: true, // Giữ nguyên state hiện tại
-            replace: true,       // Không tạo thêm lịch sử duyệt web dư thừa
-        });
-    }, 300); // Đợi người dùng gõ xong (300ms) mới gọi API
-});
 
 const deletePermission = (id: number) => {
     if (confirm('Bạn có chắc chắn muốn xóa quyền này? Nếu xóa, các vai trò đang giữ quyền này cũng sẽ bị mất quyền.')) {
@@ -73,11 +71,110 @@ const forceDeletePermission = (id: number) => {
     }
 };
 
-const viewingRestore = ref(false);
+const viewingRestore = ref(props.is_trashed === 'true');
 
 const toggleRestoreView = () => {
-    viewingRestore.value = !viewingRestore.value;
+    // 👇 ĐÃ SỬA: Tương tác với biến 'filters' cục bộ thay vì 'props'
+    filters.value.is_trashed = !filters.value.is_trashed;
+    viewingRestore.value = filters.value.is_trashed; 
+    selectedIds.value = []; // Reset checkbox
 };
+
+const selectedIds = ref<number[]>([]);
+
+const isAllSelected = computed(() => {
+    // Lấy nguồn data tùy theo việc đang ở bảng nào
+    const dataSource = viewingRestore.value ? props.restore.data : props.permissions.data;
+    return dataSource.length > 0 && selectedIds.value.length === dataSource.length;
+});
+
+const toggleSelectAll = (event: Event) => {
+    const isChecked = (event.target as HTMLInputElement).checked;
+    const dataSource = viewingRestore.value ? props.restore.data : props.permissions.data;
+    
+    if (isChecked) {
+        selectedIds.value = dataSource.map(item => item.id);
+    } else {
+        selectedIds.value = [];
+    }
+};
+
+const bulkDeleteSelected = () => {
+    if (selectedIds.value.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 mục để xóa.');
+        return;
+    }
+
+    if (confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.value.length} quyền hạn này không?`)) {
+        router.delete('/permissions/bulk-delete', {
+            data: { ids: selectedIds.value },
+            preserveState: true,
+            onSuccess: () => {
+                selectedIds.value = [];
+            }
+        });
+    }
+};
+
+const bulkRestoreSelected = () => {
+    if (selectedIds.value.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 mục để khôi phục.');
+        return;
+    }
+
+    if (confirm(`Bạn có chắc chắn muốn khôi phục ${selectedIds.value.length} quyền hạn này không?`)) {
+        router.put('/permissions/bulk-restore', 
+            { ids: selectedIds.value },
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    selectedIds.value = [];
+                }
+            }
+        );
+    }
+};
+
+// ==========================================
+// LOGIC FILTER
+// ==========================================
+const filterConfig = [
+    {
+        key: 'search',
+        type: 'text' as const,
+        placeholder: 'Tìm kiếm tên, nhóm...',
+    },
+    {
+        key: 'group',
+        type: 'multi-checkbox' as const,
+        placeholder: 'Lọc theo nhóm',
+        // 👇 ĐÃ SỬA: Cập nhật lại tùy chọn nhóm cho đúng logic
+        options: [
+            { label: 'Admin', value: 'admin' },
+            { label: 'Manager', value: 'manager' },
+            { label: 'Staff', value: 'staff' },
+            { label: 'Tất cả (All)', value: 'all' },
+        ]
+    },
+];
+
+const filters = ref({
+    search: props.filters?.search || '',
+    group: props.filters?.group ? props.filters.group.split(',') : [],
+    is_trashed: props.is_trashed === 'true' 
+});
+
+watch(filters, (newFilters) => {
+    router.get('/permissions', {
+        search: newFilters.search,
+        group: newFilters.group.join(','),    
+        is_trashed: newFilters.is_trashed ? 'true' : 'false'
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+}, { deep: true });
 </script>
 
 <template>
@@ -91,15 +188,6 @@ const toggleRestoreView = () => {
                     <p class="text-muted-foreground">Định nghĩa các quyền vi mô (VD: view_users, create_employee).</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <div class="relative w-full sm:w-64">
-                        <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            v-model="searchQuery" 
-                            type="search" 
-                            placeholder="Tìm kiếm quyền..." 
-                            class="w-full pl-8"
-                        />
-                    </div>
                      <div class="flex gap-2">
                        <Button @click="toggleRestoreView" :variant="viewingRestore ? 'default' : 'outline'">
                                 <Trash2 class="h-4 w-4" />
@@ -123,12 +211,53 @@ const toggleRestoreView = () => {
                      <CardTitle>{{ viewingRestore ? 'Thùng rác quyền hạn' : 'Dữ liệu quyền hạn' }}</CardTitle>
                     <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ permissions.total }} quyền hạn.</CardDescription>
                     <CardDescription v-else>Hiển thị danh sách quyền hạn đã xóa mềm lưu trong thùng rác.</CardDescription>
+
+                     <div class="flex items-center gap-2">
+                        <Filter :config="filterConfig" v-model="filters" />
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            @click="refreshData" 
+                            :disabled="isRefreshing"
+                            title="Làm mới dữ liệu"
+                            class="bg-white"
+                        >
+                            <RefreshCw class="h-4 w-4 text-gray-600" :class="{ 'animate-spin text-blue-600': isRefreshing }" />
+                        </Button>
+                         <div class="relative w-full sm:w-64">
+                            <!-- <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                                v-model="searchQuery" 
+                                type="search" 
+                                placeholder="Tìm kiếm quyền..." 
+                                class="w-full pl-8"
+                            /> -->
+                            <div v-if="selectedIds.length > 0 && !viewingRestore" class="flex items-center gap-2">
+                                <Button variant="destructive" @click="bulkDeleteSelected" class="gap-2">
+                                    <Trash2 class="h-4 w-4" /> Xóa {{ selectedIds.length }} quyền
+                                </Button>
+                            </div>
+                            <div v-if="selectedIds.length > 0 && viewingRestore" class="flex items-center gap-2">
+                                <Button variant="destructive" @click="bulkRestoreSelected" class="gap-2">
+                                    <Trash2 class="h-4 w-4" /> Khôi phục {{ selectedIds.length }} quyền
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left">
                             <thead>
                                 <tr class="border-b">
+                                    <th scope="col" class="px-4 py-3 w-10">
+                                        <input 
+                                            type="checkbox" 
+                                            class="rounded border-gray-300"
+                                            :checked="isAllSelected"
+                                            @change="toggleSelectAll"
+                                        >
+                                    </th>
                                     <th class="py-3 px-4 font-medium">Tên Quyền (Mã code)</th>
                                     <th class="py-3 px-4 font-medium">Nhóm</th>
                                     <th class="py-3 px-4 font-medium text-right">Hành động</th>
@@ -136,6 +265,14 @@ const toggleRestoreView = () => {
                             </thead>
                               <tbody v-if="!viewingRestore" class="divide-y">
                                 <tr v-for="perm in (permissions.data || [])" :key="perm.id" class="border-b hover:bg-muted/50">
+                                    <td class="px-4 py-4">
+                                        <input 
+                                            type="checkbox" 
+                                            class="rounded border-gray-300"
+                                            :value="perm.id" 
+                                            v-model="selectedIds"
+                                        >
+                                    </td>
                                     <td class="py-3 px-4 font-mono text-primary font-medium">{{ perm.name }}</td>
                                     <td class="py-3 px-4">
                                         <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded-md text-xs border">
@@ -161,6 +298,12 @@ const toggleRestoreView = () => {
                             </tbody>
                             <tbody v-else-if="viewingRestore && restore.data.length > 0" class="divide-y">
                                 <tr v-for="perm in restore.data" :key="perm.id" class="border-b hover:bg-muted/50">
+                                    <td class="py-3 px-4">
+                                        <input type="checkbox" 
+                                            :value="perm.id" 
+                                            v-model="selectedIds" 
+                                            class="rounded border-gray-300 text-primary focus:ring-primary">
+                                    </td>
                                     <td class="py-3 px-4 font-mono text-primary font-medium">{{ perm.name }}</td>
                                     <td class="py-3 px-4">
                                         <span class="bg-gray-100 text-gray-700 px-2 py-1 rounded-md text-xs border">

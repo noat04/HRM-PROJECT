@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 // Kế thừa class Role của Spatie thay vì Model mặc định của Laravel
 use Spatie\Permission\Models\Role as SpatieRole; 
+use App\Traits\LogsActivityCustom;
 
 class Role extends SpatieRole
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, LogsActivityCustom;
 
     /**
      * Các trường cho phép insert dữ liệu hàng loạt (Mass Assignment)

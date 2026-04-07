@@ -35,7 +35,7 @@ class RoleRequest extends FormRequest
             'description' => [
                 'nullable',
                 'string',
-                'max:255',
+                'max:5000',
                 // 👇 Mình đã thêm dấu phẩy (\,) và dấu chấm (\.) để gõ được câu mô tả dài
                 'regex:/^[\pL\s\-\_\,\.]+$/u', 
             ],

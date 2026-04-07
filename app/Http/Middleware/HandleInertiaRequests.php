@@ -47,7 +47,10 @@ class HandleInertiaRequests extends Middleware
                 'user' => $user,
                 // 👇 Gửi danh sách Role và Permission của User này sang cho Vue
                 'roles' => $user ? $user->roles->pluck('name') : [],
-                'permissions' => $user ? $user->getAllPermissions()->pluck('name') : [],
+                // 👇 SỬ DỤNG ĐOẠN CODE NÀY ĐỂ LUÔN LẤY QUYỀN MỚI NHẤT
+            'permissions' => $request->user() 
+                ? $request->user()->getAllPermissions()->pluck('name') 
+                : [],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [

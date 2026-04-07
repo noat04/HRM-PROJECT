@@ -5,9 +5,10 @@ import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Pencil, Trash2, Eye, Plus, Search ,RotateCcw} from 'lucide-vue-next';
+import {RefreshCw, Pencil, Trash2, Eye, Plus, Search ,RotateCcw} from 'lucide-vue-next';
 import type { BreadcrumbItem } from '@/types';
 import { usePermission } from '@/composables/usePermission';
+import { Filter } from '@/components/ui/filter';
 const { hasRole,hasPermission } = usePermission();
 // ==========================================
 // KHAI BÁO BIẾN
@@ -36,7 +37,7 @@ interface PaginatedUsers {
     current_page: number;
     total: number;
     per_page: number;
-    filters?: { search?: string };
+    filters?: { search?: string, status?: string, role?: string, is_trashed?: string };
     links: { url: string | null; label: string; active: boolean }[];
 }
 
@@ -44,12 +45,32 @@ const props = defineProps<{
     users: PaginatedUsers;
     restore: User[];
     roles: Role[]; // <--- THÊM DÒNG NÀY VÀO LÀ HẾT LỖI
+    filters: {
+        search: string;
+        status: string;
+        role: string;
+    };
+    is_trashed: string;
     processing?: boolean;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Người dùng', href: '/users' },
 ];
+
+const isRefreshing = ref(false);
+
+const refreshData = () => {
+    router.reload({
+        only: ['users'], // Tối ưu: Chỉ gọi API để lấy mới đúng mảng users, bỏ qua các dữ liệu khác
+        onStart: () => {
+            isRefreshing.value = true; // Bắt đầu xoay icon
+        },
+        onFinish: () => {
+            isRefreshing.value = false; // Dừng xoay icon
+        }
+    });
+};
 
 // ==========================================
 // LOGIC XỬ LÝ THÔNG BÁO FLASH MESSAGE
@@ -92,25 +113,6 @@ const deleteUser = (id: number) => {
 };
 
 // ==========================================
-// LOGIC XỬ LÝ TÌM KIẾM
-// ==========================================
-const search = ref(props.users?.filters?.search || '');
-let searchTimeout: ReturnType<typeof setTimeout>;
-
-watch(search, (value) => {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        router.get('/users', 
-            { search: value },
-            { 
-                preserveState: true,
-                replace: true
-            }
-        );
-    }, 300);
-});
-
-// ==========================================
 // LOGIC XỬ LÝ NGÀY THÁNG
 // ==========================================
 const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null => {
@@ -125,10 +127,20 @@ const formatDate = (timestamp: EpochTimeStamp | null | undefined): string | null
 
 const viewingRestore = ref(false);
 
+// const toggleRestoreView = () => {
+//     viewingRestore.value = !viewingRestore.value;
+// };
+// Sửa lại nút bấm Thùng rác: Ép nó gửi API kèm biến is_trashed
 const toggleRestoreView = () => {
-    viewingRestore.value = !viewingRestore.value;
+    // Đảo ngược trạng thái
+    filters.value.is_trashed = !filters.value.is_trashed;
+    
+    // Đồng bộ với biến UI cũ của bạn
+    viewingRestore.value = filters.value.is_trashed; 
+    
+    // Reset lại ô check
+    selectedIds.value = [];
 };
-
 const restoreUser = (id: number) => {
     if (confirm('Bạn có chắc chắn muốn khôi phục người dùng này không?')) {
         router.put(`/users/${id}/restore`);
@@ -140,6 +152,130 @@ const forceDeleteUser = (id: number) => {
         router.delete(`/users/${id}/force-delete`);
     }
 };
+
+// 1. Biến mảng chứa các ID đang được tick
+const selectedIds = ref<number[]>([]);
+
+// 2. Computed kiểm tra xem nút "Chọn tất cả" có đang được tick hay không
+const isAllSelected = computed(() => {
+    return props.users.data.length > 0 && selectedIds.value.length === props.users.data.length;
+});
+
+// 3. Hàm xử lý khi bấm vào checkbox "Chọn tất cả" ở trên cùng
+const toggleSelectAll = (event: Event) => {
+    const isChecked = (event.target as HTMLInputElement).checked;
+    if (isChecked) {
+        // Nếu tick -> Đẩy toàn bộ ID của trang hiện tại vào mảng
+        selectedIds.value = props.users.data.map(user => user.id);
+    } else {
+        // Nếu bỏ tick -> Làm rỗng mảng
+        selectedIds.value = [];
+    }
+};
+
+// 4. Hàm xử lý khi tick vào từng checkbox con
+const toggleSelectUser = (userId: number) => {
+    const index = selectedIds.value.indexOf(userId);
+    if (index > -1) {
+        // Nếu đã có trong mảng -> Xóa nó đi (Bỏ chọn)
+        selectedIds.value.splice(index, 1);
+    } else {
+        // Nếu chưa có -> Thêm nó vào (Chọn)
+        selectedIds.value.push(userId);
+    }
+};
+
+// 5. Hàm gửi yêu cầu xóa hàng loạt
+const bulkDeleteSelected = () => {
+    if (selectedIds.value.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 người dùng để xóa.');
+        return;
+    }
+
+    if (confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.value.length} người dùng này không?`)) {
+        router.delete('/users/bulk-delete', {
+            data: { ids: selectedIds.value },
+            preserveState: true,
+            onSuccess: () => {
+                // Reset lại trạng thái sau khi xóa thành công
+                selectedIds.value = [];
+            }
+        });
+    }
+};
+
+const bulkRestoreSelected = () => {
+    if (selectedIds.value.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 người dùng để khôi phục.');
+        return;
+    }
+
+    if (confirm(`Bạn có chắc chắn muốn khôi phục ${selectedIds.value.length} người dùng này không?`)) {
+        router.put('/users/bulk-restore', 
+            // Tham số thứ 2: Dữ liệu (Payload) gửi lên Backend
+            { 
+                ids: selectedIds.value 
+            }, 
+            // Tham số thứ 3: Cấu hình của Inertia (Options)
+            {
+                preserveState: true,
+                onSuccess: () => {
+                    selectedIds.value = [];
+                }
+            }
+        );
+    }
+};
+
+
+// ==========================================
+// LOGIC FILTER (TÍCH CHỌN NHIỀU)
+// ==========================================
+const filterConfig = [
+    {
+        key: 'search',
+        type: 'text' as const, // 👇 Thêm "as const" vào đây
+        placeholder: 'Tìm kiếm tên, email...',
+    },
+    {
+        key: 'status',
+        type: 'multi-checkbox' as const, // 👇 Thêm "as const" vào đây
+        placeholder: 'Trạng thái',
+        options: [
+            { label: 'Hoạt động', value: 'active' },
+            { label: 'Không hoạt động', value: 'inactive' },
+        ]
+    },
+    {
+        key: 'role',
+        type: 'multi-checkbox' as const, // 👇 Thêm "as const" vào đây
+        placeholder: 'Vai trò',
+        options: props.roles.map(r => ({ label: r.name, value: r.id }))
+    }
+];
+
+// 1. Thêm is_trashed vào filters để URL cũng nhớ trạng thái thùng rác
+const filters = ref({
+    search: props.filters?.search || '',
+    status: props.filters?.status ? props.filters.status.split(',') : [],
+    role: props.filters?.role ? props.filters.role.split(',') : [],
+    is_trashed: props.is_trashed === 'true' // Đọc từ Props
+});
+
+// 3. Trong cái Watch của filters, nhớ gài thêm is_trashed vào object gửi lên
+watch(filters, (newFilters) => {
+    router.get('/users', {
+        search: newFilters.search,
+        status: newFilters.status.join(','), 
+        role: newFilters.role.join(','),    
+        is_trashed: newFilters.is_trashed ? 'true' : 'false' // Gửi cờ báo hiệu lên
+    }, {
+        preserveState: true,
+        preserveScroll: true,
+        replace: true
+    });
+}, { deep: true });
+
 </script>
 
 <template>
@@ -154,7 +290,7 @@ const forceDeleteUser = (id: number) => {
                 </div>
 
                 <div class="flex items-center gap-4">
-                    <div class="relative w-64">
+                    <!-- <div class="relative w-64">
                         <Search class="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input 
                             v-model="search" 
@@ -162,6 +298,16 @@ const forceDeleteUser = (id: number) => {
                             placeholder="Tìm kiếm tên, email..." 
                             class="pl-8 bg-white" 
                         />
+                    </div> -->
+                    <div v-if="selectedIds.length > 0 && !viewingRestore" class="flex items-center gap-2">
+                        <Button variant="destructive" @click="bulkDeleteSelected" class="gap-2">
+                            <Trash2 class="h-4 w-4" /> Xóa {{ selectedIds.length }} người dùng
+                        </Button>
+                    </div>
+                    <div v-if="selectedIds.length > 0 && viewingRestore" class="flex items-center gap-2">
+                        <Button variant="destructive" @click="bulkRestoreSelected" class="gap-2">
+                            <Trash2 class="h-4 w-4" /> Khôi phục {{ selectedIds.length }} người dùng
+                        </Button>
                     </div>
                     <div class="flex gap-2">
                         <Button @click="toggleRestoreView" :variant="viewingRestore ? 'default' : 'outline'" class="gap-2">
@@ -203,12 +349,33 @@ const forceDeleteUser = (id: number) => {
                     <CardTitle>{{ viewingRestore ? 'Thùng rác vai trò' : 'Dữ liệu vai trò' }}</CardTitle>
                     <CardDescription v-if="!viewingRestore">Hiển thị tổng cộng {{ users?.data?.length || 0 }} người dùng.</CardDescription>
                     <CardDescription v-else>Hiển thị danh sách người dùng đã xóa mềm lưu trong thùng rác.</CardDescription>
+                    <div class="flex items-center gap-2">
+                        <Filter :config="filterConfig" v-model="filters" />
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            @click="refreshData" 
+                            :disabled="isRefreshing"
+                            title="Làm mới dữ liệu"
+                            class="bg-white"
+                        >
+                            <RefreshCw class="h-4 w-4 text-gray-600" :class="{ 'animate-spin text-blue-600': isRefreshing }" />
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-gray-500">
                             <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b">
                                 <tr>
+                                    <th scope="col" class="px-4 py-3 w-10">
+                                        <input 
+                                            type="checkbox" 
+                                            class="rounded border-gray-300"
+                                            :checked="isAllSelected"
+                                            @change="toggleSelectAll"
+                                        >
+                                    </th>
                                     <th scope="col" class="px-6 py-3">ID</th>
                                     <th scope="col" class="px-6 py-3">Tên</th>
                                     <th scope="col" class="px-6 py-3">Email</th>
@@ -219,6 +386,14 @@ const forceDeleteUser = (id: number) => {
                             </thead>
                             <tbody v-if="!viewingRestore" class="divide-y">
                                 <tr v-for="user in users.data" :key="user.id" class="bg-white border-b hover:bg-gray-50 transition-colors">
+                                    <td class="px-4 py-4">
+                                        <input 
+                                            type="checkbox" 
+                                            class="rounded border-gray-300"
+                                            :value="user.id" 
+                                            v-model="selectedIds"
+                                        >
+                                    </td>
                                     <td class="px-6 py-4 font-medium text-gray-900">{{ user.id }}</td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
@@ -288,6 +463,14 @@ const forceDeleteUser = (id: number) => {
                             </tbody>
                             <tbody v-else class="divide-y">
                                 <tr v-for="user in restore" :key="user.id" class="bg-white border-b hover:bg-gray-50 transition-colors">
+                                     <td class="px-4 py-4">
+                                        <input 
+                                            type="checkbox" 
+                                            class="rounded border-gray-300"
+                                            :value="user.id" 
+                                            v-model="selectedIds"
+                                        >
+                                    </td>
                                     <td class="px-6 py-4 font-medium text-gray-900">{{ user.id }}</td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center gap-3">
