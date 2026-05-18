@@ -34,55 +34,6 @@ Khóa tài khoản tức thì — nhân viên nghỉ việc bị vô hiệu hóa
 Toàn bộ dữ liệu nhân viên được giữ lại để tham chiếu lịch sử 
 
 
-🚀 Hướng dẫn cài đặt nhanh (Laravel Herd / Cục bộ)
-Yêu cầu môi trường: PHP 8.4+, Laravel 12.x, Node.js, và PostgreSQL (Port 5432).
-
-Bước 1 — Tải mã nguồn
-Clone dự án vào thư mục Sites của Herd (hoặc thư mục XAMPP/Laragon của bạn):
-
-Bash
-git clone [https://github.com/noat04/HRM-PROJECT.git](https://github.com/noat04/HRM-PROJECT.git)
-cd HRM-PROJECT
-Bước 2 — Cài đặt thư viện
-Cài đặt các gói phụ thuộc cho Backend (PHP) và Frontend (Vue + Inertia):
-
-Bash
-composer install
-npm install
-Bước 3 — Cấu hình môi trường (.env)
-Tạo file môi trường và sinh khóa bảo mật:
-
-Bash
-cp .env.example .env
-php artisan key:generate
-Mở file .env, cập nhật múi giờ và thông tin kết nối database PostgreSQL:
-
-Đoạn mã
-APP_TIMEZONE=Asia/Ho_Chi_Minh
-
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=hrm
-DB_USERNAME=postgres
-DB_PASSWORD=your_password
-Bước 4 — Khởi tạo Database & Dữ liệu mẫu
-Tạo database tên hrm trong PostgreSQL trước, sau đó chạy lệnh:
-
-Bash
-php artisan migrate --seed
-(Lệnh seed sẽ tự động tạo sẵn các Role hệ thống, tài khoản Admin, chuyên viên C&B, danh sách nhân viên mẫu và lịch sử chấm công).
-
-Bước 5 — Vận hành hệ thống
-Bật terminal và chạy bộ biên dịch Frontend (Vite):
-
-Bash
-npm run dev
-(Nếu bạn không dùng Laravel Herd, hãy mở thêm 1 tab terminal và chạy php artisan serve để khởi động Backend).
-
-Truy cập http://hrm.test (hoặc localhost:8000) và đăng nhập bằng tài khoản Admin được cung cấp sau khi Seed.
-
-🛡 Cam kết về độ chính xác dữ liệu
 LaraHRM được xây dựng với nguyên tắc lõi: "Dữ liệu tài chính không bao giờ được sai lệch":
 
 ✅ Phiếu lương tháng 3/2025 in ra ở năm 2030 vẫn đúng từng con số như ngày chốt sổ.
@@ -97,5 +48,3 @@ Tác giả: Nguyễn Danh Minh Toàn
 Email: toannguyen041214@gmail.com
 
 GitHub Portfolio: github.com/noat04
-
-LaraHRM — Đơn giản hóa quản trị, tối ưu hóa độ chính xác.
