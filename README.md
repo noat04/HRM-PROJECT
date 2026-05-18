@@ -1,135 +1,101 @@
-LaraHRM - Hệ thống Quản trị Nhân sự & Tiền lương Enterprise
-Mô tả: Hệ thống ERP mini tập trung vào quản lý Nhân sự (HRM), Chấm công (Time Tracking) và Tính lương (Payroll).
+👥 LaraHRM — Hệ thống Quản trị Nhân sự & Tiền lương
 
-Triết lý thiết kế:
-
--Data Integrity (Toàn vẹn dữ liệu): Ưu tiên độ chính xác tuyệt đối, đặc biệt trong tính toán tiền lương (Decimal Precision) và lịch sử chấm công (Immutable History).
-
-Scalability (Khả năng mở rộng): Tách biệt logic nghiệp vụ, sử dụng Design Patterns để dễ dàng thêm mới quy tắc tính lương mà không sửa core.
-
-Performance (Hiệu năng): Tối ưu hóa cho dữ liệu lớn (Big Data) với hàng triệu bản ghi chấm công.
-
-🏗 Kiến trúc Hệ thống (System Architecture)
-Dự án được chia thành 4 module nghiệp vụ chính, áp dụng Domain-Driven Design (DDD):
-
-1. Authentication & RBAC (Quản trị & Phân quyền)
-Core Logic: Sử dụng Spatie Permission với cơ chế Polymorphic Relations.
-
-Feature:
-
-Phân quyền động tới từng chức năng (View Salary, Approve Leave...).
-
-Middleware bảo mật 2 lớp: Chặn ngay lập tức User bị khóa (Banned) kể cả khi session chưa hết hạn.
-
-Soft Deletes: Bảo toàn dữ liệu User để tham chiếu lịch sử.
-
-2. Organization (Tổ chức & Nhân sự)
-Core Logic: Quản lý sơ đồ tổ chức đa cấp (Recursive Tree) và quan hệ nhân sự.
-
-Feature:
-
-Self-Referencing Relationship: Quản lý quan hệ "Sếp - Lính" (Manager - Direct Reports) không giới hạn cấp bậc.
-
-Automated Coding: Observer Pattern tự động sinh mã nhân viên (NV-2024-XXXX) đảm bảo không trùng lặp.
-
-Loose Coupling: Tách biệt User (Identity) và Employee (Profile) để đảm bảo nghiệp vụ nhân sự không bị ảnh hưởng bởi thay đổi hệ thống đăng nhập.
-
-3. Time & Attendance (Chấm công & Thời gian)
-Core Logic: Xử lý Big Data và Logic thời gian thực.
-
-Feature:
-
-Plan vs. Actual Separation: Tách biệt "Lịch phân ca" (employee_shifts) và "Dữ liệu chấm công thực tế" (attendances).
-
-Snapshot Logic: Lưu cứng shift_id tại thời điểm check-in để đảm bảo lịch sử không bị sai lệch khi HR đổi lịch làm việc.
-
-Performance: Đánh Index (employee_id, date) giúp truy vấn bảng công tháng (30-31 ngày) dưới 50ms trên tập dữ liệu 1 triệu dòng.
-
-4. Payroll Engine (Tính lương)
-Core Logic: Hệ thống tính lương động (Dynamic Formula) và Kế toán (Accounting).
-
-Feature:
-
-- EAV Model Variation: Cấu trúc salary_components cho phép thêm bớt các khoản phụ cấp/khấu trừ mà không cần sửa DB Schema.
-
-- Immutable History (Snapshot): Sử dụng bảng payslip_details lưu chết giá trị và tên khoản lương tại thời điểm tính. Đảm bảo in phiếu lương quá khứ luôn đúng 100%.
-
-- Strategy Pattern: Tách biệt logic tính toán (Lương ngày công, Lương KPI, Thuế) thành các class riêng biệt.
-
-- ACID Transaction: Đảm bảo quá trình chốt lương (Lock) và trừ quỹ lương diễn ra nguyên vẹn.
-
-🗄 Database Schema (ERD Highlight)
-Module: Payroll (Tính lương)
-Mối quan hệ đảm bảo tính "Bất biến lịch sử":
-
-Đoạn mã
-erDiagram
-    EMPLOYEES ||--o{ PAYSLIPS : "has history"
-    PAYROLL_PERIODS ||--o{ PAYSLIPS : "contains"
-    PAYSLIPS ||--o{ PAYSLIP_DETAILS : "snapshots"
-    
-    PAYSLIP_DETAILS {
-        bigint id PK
-        string component_name "Snapshot Name"
-        decimal amount "Snapshot Value"
-        enum type "Earning/Deduction"
-    }
-payslip_details: Lưu giá trị snapshot. Không Join trực tiếp với salary_components để tránh lỗi sai lệch lịch sử khi đổi tên/công thức lương.
-
-Module: Time & Attendance (Chấm công)
-Mối quan hệ "Tách biệt Kế hoạch và Thực tế":
-
-Đoạn mã
-erDiagram
-    EMPLOYEES ||--o{ EMPLOYEE_SHIFTS : "Plan (HR Config)"
-    SHIFTS ||--o{ EMPLOYEE_SHIFTS : "Plan"
-    
-    SHIFTS ||--o{ ATTENDANCES : "Actual (Snapshot ID)"
-    EMPLOYEES ||--o{ ATTENDANCES : "Actual Check-in"
-attendances: Lưu trực tiếp shift_id tại thời điểm check-in. Query báo cáo cực nhanh mà không cần tính toán lại lịch sử phân ca.
-
-🛠 Tech Stack & Libraries
-Category,Technology,Usage
-Backend Framework,Laravel 10.x,Core System
-Language,PHP 8.2,"Enums, Types, Readonly Classes"
-Database,MySQL 8.0,"JSON Column, Partitioning support"
-Frontend,Vue.js 3 + Vite,Single Page Application (SPA)
-Auth,Laravel Sanctum,API Authentication
-Excel,Maatwebsite/Excel,Export Report (Japanese standard format)
-Date Handling,Carbon,Timezone & Diff calculation
-Task Scheduling,Laravel Scheduler,"Cronjob: Auto Checkout, Salary Calculation"
+Dành cho Phòng Nhân sự: Quản lý toàn bộ vòng đời nhân viên — từ hồ sơ, chấm công đến bảng lương — trên một nền tảng duy nhất, chính xác và minh bạch.
 
 
-📦 Installation
-Clone repo:
+🎯 LaraHRM giải quyết bài toán gì?
+Vấn đề thường gặpLaraHRM giải quyết như thế nàoChấm công thủ công, dễ sai sótTự động ghi nhận giờ vào/ra, cảnh báo bất thườngTính lương mất nhiều ngày, dễ nhầmHệ thống tự tính dựa trên dữ liệu chấm công thực tếPhiếu lương cũ không in lại được đúngLưu trữ vĩnh viễn, in lại bất kỳ tháng nào đều chính xác 100%Khó kiểm soát phân quyền nhân viênPhân quyền chi tiết từng chức năng (ai xem lương, ai duyệt phép...)Sơ đồ tổ chức phức tạp, nhiều cấpQuản lý chuỗi Sếp → Nhân viên không giới hạn cấp bậc
+
+✨ Tính năng chính
+👤 Quản lý Nhân sự
+
+Hồ sơ nhân viên đầy đủ, mã nhân viên tự động sinh (NV-2024-XXXX)
+Sơ đồ tổ chức đa cấp, quản lý quan hệ quản lý trực tiếp
+Tách biệt tài khoản đăng nhập và hồ sơ nhân viên — thay đổi hệ thống không ảnh hưởng dữ liệu
+
+🕐 Chấm công & Ca làm việc
+
+Lên lịch phân ca linh hoạt cho từng nhân viên
+Ghi nhận giờ vào/ra thực tế riêng biệt với lịch kế hoạch
+Lịch sử chấm công bất biến — HR điều chỉnh ca làm sau này không làm sai dữ liệu cũ
+Tự động chốt giờ ra cuối ngày (qua hệ thống lên lịch tự động)
+
+💰 Tính lương & Phiếu lương
+
+Cấu hình linh hoạt các khoản: lương cơ bản, phụ cấp, thưởng KPI, khấu trừ...
+Tính lương tự động dựa trên ngày công thực tế
+Phiếu lương snapshot — giá trị được lưu cứng tại thời điểm chốt, in lại tháng nào cũng đúng
+Hỗ trợ xuất báo cáo lương theo chuẩn Excel
+
+🔐 Phân quyền & Bảo mật
+
+Phân quyền chi tiết: Xem lương, Duyệt phép, Quản lý nhân viên...
+Khóa tài khoản tức thì — nhân viên nghỉ việc bị vô hiệu hóa ngay, không chờ hết phiên đăng nhập
+Toàn bộ dữ liệu nhân viên được giữ lại để tham chiếu lịch sử 
+
+
+🚀 Hướng dẫn cài đặt nhanh (Laravel Herd / Cục bộ)
+Yêu cầu môi trường: PHP 8.4+, Laravel 12.x, Node.js, và PostgreSQL (Port 5432).
+
+Bước 1 — Tải mã nguồn
+Clone dự án vào thư mục Sites của Herd (hoặc thư mục XAMPP/Laragon của bạn):
 
 Bash
-git clone https://github.com/your-username/larahrm.git
-cd larahrm
-Install dependencies:
+git clone [https://github.com/noat04/HRM-PROJECT.git](https://github.com/noat04/HRM-PROJECT.git)
+cd HRM-PROJECT
+Bước 2 — Cài đặt thư viện
+Cài đặt các gói phụ thuộc cho Backend (PHP) và Frontend (Vue + Inertia):
 
 Bash
 composer install
 npm install
-Environment setup:
+Bước 3 — Cấu hình môi trường (.env)
+Tạo file môi trường và sinh khóa bảo mật:
 
 Bash
 cp .env.example .env
 php artisan key:generate
-Database & Seeding:
+Mở file .env, cập nhật múi giờ và thông tin kết nối database PostgreSQL:
+
+Đoạn mã
+APP_TIMEZONE=Asia/Ho_Chi_Minh
+
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=hrm
+DB_USERNAME=postgres
+DB_PASSWORD=your_password
+Bước 4 — Khởi tạo Database & Dữ liệu mẫu
+Tạo database tên hrm trong PostgreSQL trước, sau đó chạy lệnh:
 
 Bash
-# Chạy Migration và tạo dữ liệu mẫu (Admin, 1000 Nhân viên, Chấm công)
 php artisan migrate --seed
-Run:
+(Lệnh seed sẽ tự động tạo sẵn các Role hệ thống, tài khoản Admin, chuyên viên C&B, danh sách nhân viên mẫu và lịch sử chấm công).
+
+Bước 5 — Vận hành hệ thống
+Bật terminal và chạy bộ biên dịch Frontend (Vite):
 
 Bash
-php artisan serve
 npm run dev
+(Nếu bạn không dùng Laravel Herd, hãy mở thêm 1 tab terminal và chạy php artisan serve để khởi động Backend).
 
-📝 Contact
-Developer: Nguyen Danh Minh Toan
+Truy cập http://hrm.test (hoặc localhost:8000) và đăng nhập bằng tài khoản Admin được cung cấp sau khi Seed.
+
+🛡 Cam kết về độ chính xác dữ liệu
+LaraHRM được xây dựng với nguyên tắc lõi: "Dữ liệu tài chính không bao giờ được sai lệch":
+
+✅ Phiếu lương tháng 3/2025 in ra ở năm 2030 vẫn đúng từng con số như ngày chốt sổ.
+
+✅ Thay đổi cấu trúc lương/phụ cấp của hiện tại không ảnh hưởng đến bảng lương quá khứ.
+
+✅ Chỉnh sửa lịch ca làm việc sau kỳ chấm công không làm sai lệch dữ liệu chuyên cần đã ghi nhận.
+
+📞 Liên hệ & Hỗ trợ
+Tác giả: Nguyễn Danh Minh Toàn
 
 Email: toannguyen041214@gmail.com
 
-Portfolio: https://github.com/noat04
+GitHub Portfolio: github.com/noat04
+
+LaraHRM — Đơn giản hóa quản trị, tối ưu hóa độ chính xác.
