@@ -5,12 +5,12 @@ import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { BreadcrumbItem } from '@/types';
-import LeaveRequestStatus from '@/enums/LeaveRequestStatus';
+import { AlertCircle, CheckCircle2, XCircle } from 'lucide-vue-next'; // Thêm icon báo lỗi
 
 interface Employee {
     id: number;
     full_name: string;
-    manager_id: number | null; // Phải có manager_id để tự động tìm
+    manager_id: number | null;
 }
 
 interface LeaveType {
@@ -19,36 +19,38 @@ interface LeaveType {
 }
 
 const props = defineProps<{
-    employees: Employee[];
-    leaveTypes: LeaveType[];
+    employees: any[];
+    managers: any[];
+    leaveTypes: any[];
+    default_employee_id: number | null; 
+    default_manager_id: number | null;  
 }>();
 
+// 2. 👇 ĐÃ SỬA: Bổ sung 'total_days' vào giá trị khởi tạo của useForm
 const form = useForm({
-    employee_id: '',
-    manager_id: '' as number | string, // Thêm trường manager_id để gửi lên Server
+    employee_id: props.default_employee_id || '', 
+    manager_id: props.default_manager_id || '',   
     leave_type_id: '',
     start_date: '',
     end_date: '',
-    total_days: 0,
+    total_days: 0, // Khai báo rõ ràng để v-model hoạt động mượt mà
     reason: '',
-    status: LeaveRequestStatus.PENDING,
+    status: 'pending',
 });
 
-// 👇 LOGIC TỰ ĐỘNG TÌM QUẢN LÝ
+// LOGIC TỰ ĐỘNG TÌM QUẢN LÝ
 watch(() => form.employee_id, (newEmployeeId) => {
     if (newEmployeeId) {
-        // Tìm nhân viên đang được chọn trong danh sách
         const selectedEmployee = props.employees.find(emp => emp.id === Number(newEmployeeId));
-        // Lấy ID quản lý của người đó gán vào form
         form.manager_id = selectedEmployee?.manager_id || '';
     } else {
         form.manager_id = '';
     }
 });
 
-// Hàm hiển thị tên quản lý ra màn hình cho người dùng xem
+// Hiển thị tên quản lý ra màn hình cho người dùng xem
 const managerName = computed(() => {
-    if (!form.manager_id) return 'Chưa có quản lý';
+    if (!form.manager_id) return 'Chưa có quản lý trực tiếp';
     const manager = props.employees.find(emp => emp.id === form.manager_id);
     return manager ? manager.full_name : 'Không xác định';
 });
@@ -60,17 +62,35 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const submit = () => {
-    form.post('/leaves/requests');
+    form.post('/leaves/requests', {
+        preserveScroll: true,
+        onError: () => {
+            showFlashError.value = true;
+            setTimeout(() => showFlashError.value = false, 5000);
+        }
+    });
 };
 
 const page = usePage();
+
+// 💡 ĐÃ BỔ SUNG: Bắt cả thông báo thành công lẫn thất bại từ Laravel gửi về
 const flashSuccess = computed(() => (page.props as any).flash?.success);
-const showFlash = ref(false);
+const flashError = computed(() => (page.props as any).flash?.error);
+
+const showFlashSuccess = ref(false);
+const showFlashError = ref(false);
 
 watch(flashSuccess, (newMessage) => {
     if (newMessage) {
-        showFlash.value = true;
-        setTimeout(() => showFlash.value = false, 3000);
+        showFlashSuccess.value = true;
+        setTimeout(() => showFlashSuccess.value = false, 4000);
+    }
+}, { immediate: true });
+
+watch(flashError, (newErrorMessage) => {
+    if (newErrorMessage) {
+        showFlashError.value = true;
+        setTimeout(() => showFlashError.value = false, 5000);
     }
 }, { immediate: true });
 
@@ -95,23 +115,25 @@ const calculateTotalDays = () => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="space-y-6 p-6 max-w-4xl mx-auto w-full">
             
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold tracking-tight">Tạo mới Yêu cầu nghỉ phép</h1>
-                    <p class="text-muted-foreground">Thêm yêu cầu nghỉ phép mới vào hệ thống.</p>
-                </div>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight">Tạo mới Yêu cầu nghỉ phép</h1>
+                <p class="text-muted-foreground">Thêm yêu cầu nghỉ phép mới vào hệ thống.</p>
             </div>
 
-            <Transition
-                enter-active-class="transition ease-out duration-300"
-                enter-from-class="opacity-0 -translate-y-2"
-                enter-to-class="opacity-100 translate-y-0"
-                leave-active-class="transition ease-in duration-300"
-                leave-from-class="opacity-100 translate-y-0"
-                leave-to-class="opacity-0 -translate-y-2"
-            >
-                <div v-if="flashSuccess && showFlash" class="flex items-center rounded-lg bg-emerald-50 px-4 py-3 border border-emerald-200 text-emerald-800 shadow-sm">
+            <Transition enter-active-class="transition ease-out duration-300" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-300" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
+                <div v-if="flashSuccess && showFlashSuccess" class="flex items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 border border-emerald-200 text-emerald-800 shadow-sm">
+                    <CheckCircle2 class="h-5 w-5 text-emerald-600 shrink-0" />
                     <span class="font-medium">{{ flashSuccess }}</span>
+                </div>
+            </Transition>
+
+            <Transition enter-active-class="transition ease-out duration-300" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-300" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
+                <div v-if="flashError && showFlashError" class="flex items-start gap-2 rounded-lg bg-rose-50 px-4 py-3 border border-rose-200 text-rose-800 shadow-sm">
+                    <XCircle class="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                    <div>
+                        <strong class="font-bold">Không thể tạo đơn: </strong>
+                        <span class="font-medium">{{ flashError }}</span>
+                    </div>
                 </div>
             </Transition>
 
@@ -172,7 +194,7 @@ const calculateTotalDays = () => {
 
                         <div>
                             <label class="block text-sm font-medium mb-2">Lý do <span class="text-destructive">*</span></label>
-                            <textarea v-model="form.reason" class="w-full px-3 py-2 border rounded-md" rows="3" required></textarea>
+                            <textarea v-model="form.reason" class="w-full px-3 py-2 border rounded-md" rows="3" required placeholder="Vui lòng ghi rõ lý do nghỉ phép..."></textarea>
                             <div v-if="form.errors.reason" class="text-red-500 text-sm mt-1">{{ form.errors.reason }}</div>
                         </div>
 

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Crud\Position;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule; // 👇 1. BẮT BUỘC IMPORT RULE
 
 class PositionRequest extends FormRequest
 {
@@ -13,19 +14,21 @@ class PositionRequest extends FormRequest
 
     public function rules(): array
     {
+           $roleId = $this->route('position');
+
         return [
             'name'        => [
                 'required',
                 'string',
                 'max:255',
-                'unique:positions,name',
+                Rule::unique('positions', 'name')->ignore($roleId),
                 'regex:/^[\pL\s\-\_]+$/u',
             ],
             'code'        => [
                 'required',
                 'string',
                 'max:50',
-                'unique:positions,code',
+                Rule::unique('positions', 'code')->ignore($roleId),
                 'regex:/^[A-Z0-9\-\_]+$/',
             ],
             'level'       => 'required|integer|min:0',

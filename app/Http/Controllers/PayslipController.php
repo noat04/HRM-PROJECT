@@ -194,4 +194,41 @@ class PayslipController extends Controller
 
         return redirect()->back()->with('success', "Đã chạy tính lương tự động và tạo chi tiết cho {$generatedCount} phiếu lương!");
     }
+    
+    public function myPayslips()
+    {
+        $currentEmployee = auth()->user()->employee;
+
+        if (!$currentEmployee) {
+            return redirect()->route('dashboard')->with('error', 'Tài khoản chưa liên kết hồ sơ nhân sự!');
+        }
+
+        // Chỉ lấy các phiếu lương thuộc sở hữu của nhân viên đang login
+        $payslips = Payslip::with(['payrollPeriod'])
+            ->where('employee_id', $currentEmployee->id)
+            ->latest()
+            ->paginate(12);
+
+        return Inertia::render('Employees/Payslips/Index', [
+            'payslips' => $payslips
+        ]);
+    }
+
+    /**
+     * Nhân viên xem chi tiết một phiếu lương snapshot trong quá khứ
+     */
+    public function showMyPayslip($id)
+    {
+        $currentEmployee = auth()->user()->employee;
+        
+        // Bảo mật chuyên sâu: Chống nhân viên đổi ID trên URL để xem trộm lương người khác
+        $payslip = Payslip::with(['payrollPeriod', 'details'])
+            ->where('employee_id', $currentEmployee->id)
+            ->where('id', $id)
+            ->firstOrFail(); // Không trùng ID của mình tự động văng 404 công bọc
+
+        return Inertia::render('Payslips/Show', [
+            'payslip' => $payslip
+        ]);
+    }
 }

@@ -3,7 +3,12 @@ import { Link } from '@inertiajs/vue3';
 // 👇 Thêm icon ChevronRight cho menu xổ xuống
 import { 
     BookOpen, Folder, LayoutGrid, Building, Users, Briefcase, 
-    Shield, UserCheck, Clock, CalendarDays, Banknote, Calculator, FileText, ChevronRight
+    Shield, UserCheck, Clock, CalendarDays, Banknote, Calculator, FileText, ChevronRight, Palmtree,
+    FileSpreadsheet,
+    CalendarRange,
+    Wallet,
+    Coins,
+    CreditCard
 } from 'lucide-vue-next';
 import { computed } from 'vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -62,43 +67,81 @@ const mainNavItems = computed(() => {
                 { title: 'Ca làm việc', href: '/shifts', show: hasPermission('shift_manage') },
                 { title: 'Loại phép', href: '/leaves/types', show: hasPermission('leave_type_manage') },
                 { title: 'Số dư phép', href: '/leaves/balances', show: hasPermission('leave_balance_adjust') },
+                { title: 'Phân ca nhân sự', href: '/employee-shifts' },
                 // { title: 'Đơn xin nghỉ', href: '/leaves/requests', show: hasPermission('manager_leave_requests') },
             ]
         },
         {
             title: 'Tiền lương (C&B)',
-            icon: Banknote,
+            icon: Banknote, // Giữ nguyên icon tổng thể của phân hệ
             show: hasPermission('salary_component_manage') || hasPermission('salary_structure_view') || hasPermission('payroll_period_manage') || hasPermission('payslip_view_all'),
             items: [
-                { title: 'Phiếu lương', href: '/payslips', show: hasPermission('payslip_view_all') },
-                { title: 'Kỳ lương', href: '/payroll-periods', show: hasPermission('payroll_period_manage') },
-                { title: 'Cơ cấu lương', href: '/salary-structures', show: hasPermission('salary_structure_view') },
-                { title: 'Thành phần lương', href: '/salary-components', show: hasPermission('salary_component_manage') },
+                { 
+                    title: 'Phiếu lương tổng', 
+                    href: '/payslips', 
+                    icon: FileSpreadsheet, // Icon bảng tính tổng hợp lương
+                    show: hasPermission('payslip_view_all') 
+                },
+                { 
+                    title: 'Kỳ tính lương', 
+                    href: '/payroll-periods', 
+                    icon: CalendarRange, // Icon lịch trình quản lý kỳ công
+                    show: hasPermission('payroll_period_manage') 
+                },
+                { 
+                    title: 'Cơ cấu lương dòng', 
+                    href: '/salary-structures', 
+                    icon: Wallet, // Icon ví tiền đại diện cho hồ sơ lương cá nhân
+                    show: hasPermission('salary_structure_view') 
+                },
+                { 
+                    title: 'Thành phần lương', 
+                    href: '/salary-components', 
+                    icon: Coins, // Icon đồng xu đại diện cho các khoản phụ cấp/khấu trừ
+                    show: hasPermission('salary_component_manage') 
+                },
             ]
         },
         {
-            title: 'Quản lý nhóm',
+            title: 'Quản lý Đội nhóm', // Sửa lại tên cho chuyên nghiệp
             icon: Users,
             show: hasPermission('employee_view_team'),
             items: [
-                { title: 'Nhóm', href: '/groups', show: hasPermission('employee_view_team') },
+                // 👇 Đã sửa href từ /groups thành /manager/team cho khớp với Route ở web.php
+                { 
+                    title: 'Hồ sơ nhân sự', 
+                    href: '/manager/team', 
+                    show: hasPermission('employee_view_team') 
+                },
             ]
         },
         {
-            title: 'Phê duyệt nghỉ phép',
-            icon: Users,
+            title: 'Nghỉ phép (Team)',
+            icon: CalendarDays, 
             show: hasPermission('leave_request_approve'),
             items: [
-                { title: 'Phê duyệt nghỉ phép', href: '/leave-requests', show: hasPermission('leave_request_approve') },
+                { 
+                    title: 'Phê duyệt đơn phép', 
+                    href: '/manager/leaves', 
+                    show: hasPermission('leave_request_approve') 
+                },
             ]
         },
         {
-            title: 'Quản lý chấm công nhóm',
-            icon: Users,
-            show: hasPermission('attendance_approve_ot') || hasPermission('attendance_view_team') ,
+            title: 'Chấm công (Team)',
+            icon: Clock, 
+            show: hasPermission('attendance_approve_ot') || hasPermission('attendance_view_team'),
             items: [
-                { title: 'Phê duyệt OT', href: '/leave-requests', show: hasPermission('attendance_approve_ot') },
-                { title: 'Báo cáo đi muộn/về sớm', href: '/attendance', show: hasPermission('attendance_view_team') },
+                { 
+                    title: 'Phê duyệt Tăng ca', 
+                    href: '/manager/overtime', 
+                    show: hasPermission('attendance_approve_ot') 
+                },
+                { 
+                    title: 'Báo cáo chấm công', 
+                    href: '/manager/attendance', 
+                    show: hasPermission('attendance_view_team') 
+                },
             ]
         },
         {
@@ -107,26 +150,28 @@ const mainNavItems = computed(() => {
             show: hasPermission('profile_view_own') ,
             href: '/profile'
         },
-        {
+      {
             title: 'Chấm công',
-            icon: Users,
-            show: hasPermission('attendance_check_in') ,
-            href: '/attendance'
+            icon: Clock, // 👈 Đổi icon cho hợp ngữ cảnh
+            show: hasPermission('attendance_check_in'),
+            href: '/my-attendance' // 👈 Sửa lại đường dẫn cho khớp với web.php
         },
-        {
+      {
             title: 'Bảng Lương',
-            icon: Users,
-            show: hasPermission('payslip_view_own') ,
-            href: '/payslips'
+            icon: CreditCard, // 💡 Đổi sang icon CreditCard hoặc Wallet cho hợp ngữ cảnh ví tiền
+            show: hasPermission('payslip_view_own'),
+            href: '/my-payslips' // 💡 ĐÃ SỬA: Đổi từ '/payslips' thành '/my-payslips'
         },
-
         {
             title: 'Nghỉ phép',
-            icon: Users,
-            show: hasPermission('leave_request_create') || hasPermission('leave_balance_view_own') ,
+            icon: Palmtree, // 💡 Gợi ý đổi sang icon Palmtree hoặc Calendar cho đẹp thay vì Users
+            show: hasPermission('leave_request_create') || hasPermission('leave_balance_view_own'),
             items: [
-                { title: 'Đăng ký nghỉ phép', href: '/leave-requests/create', show: hasPermission('leave_request_create') },
-                { title: 'Số dư phép', href: '/leave-balances', show: hasPermission('leave_balance_view_own') },
+                // 👇 ĐÃ SỬA: Đổi '/leave-requests/create' thành '/leaves/requests/create'
+                { title: 'Đăng ký nghỉ phép', href: '/leaves/requests', show: hasPermission('leave_request_create') },
+                
+                // 👇 ĐÃ SỬA: Đổi '/leave-balances' thành '/leaves/balances'
+                { title: 'Số dư phép', href: '/leaves/balances', show: hasPermission('leave_balance_view_own') },
             ]
         },
     ];

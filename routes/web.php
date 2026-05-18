@@ -18,6 +18,9 @@ use App\Http\Controllers\EmployeeSalaryStructureController;
 use App\Http\Controllers\PayrollPeriodController;
 use App\Http\Controllers\PayslipController;
 use App\Http\Controllers\PermissionController;
+use App\Http\Controllers\LineManagerController;
+use App\Http\Controllers\AttendanceController; // Nhớ import ở đầu file
+use App\Http\Controllers\EmployeeShiftController;
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canRegister' => Features::enabled(Features::registration()),
@@ -81,7 +84,7 @@ Route::middleware(['auth', CheckUserStatus::class])->group(function () {
         // Quản lý thành phần lương & Kỳ lương
         Route::resource('salary-components', SalaryComponentController::class)->parameters(['salary-components' => 'salaryComponent'])->middleware('permission:salary_component_manage');
         Route::resource('payroll-periods', PayrollPeriodController::class)->parameters(['payroll-periods' => 'payrollPeriod'])->middleware('permission:payroll_period_manage');
-        
+        Route::resource('employee-shifts', EmployeeShiftController::class)->parameters(['employee-shifts' => 'employeeShift']);
         // Lệnh chạy sinh lương tự động (Chỉ HR được chạy)
         Route::post('payslips/generate', [PayslipController::class, 'generate'])->name('payslips.generate')->middleware('permission:payslip_calculate');
     });
@@ -105,6 +108,99 @@ Route::middleware(['auth', CheckUserStatus::class])->group(function () {
         // Cơ cấu lương & Phiếu lương cá nhân
         Route::resource('salary-structures', EmployeeSalaryStructureController::class)->parameters(['salary-structures' => 'salaryStructure']);
         Route::resource('payslips', PayslipController::class)->parameters(['payslips' => 'payslip']);
+        // 👇 BỔ SUNG: CÁC ROUTE CHẤM CÔNG CÁ NHÂN
+        Route::prefix('my-attendance')->name('my-attendance.')->group(function () {
+            Route::get('/', [AttendanceController::class, 'index'])->name('index');
+            Route::post('/check-in', [AttendanceController::class, 'checkIn'])->name('check-in');
+            Route::post('/check-out', [AttendanceController::class, 'checkOut'])->name('check-out');
+        });
+    });
+
+   // ==========================================
+    // 4. NHÓM CHỈ DÀNH CHO TRƯỞNG PHÒNG (LINE MANAGER)
+    // ==========================================
+    Route::middleware(['role:Line Manager|HR Manager|Super Admin'])
+        ->prefix('manager')
+        ->name('manager.')
+        ->group(function () {
+            
+            // 👇 BỔ SUNG DÒNG NÀY: Route hiển thị danh sách toàn đội nhóm
+            Route::get('team', [LineManagerController::class, 'indexTeam'])
+                ->name('team.index')
+                ->middleware('permission:employee_view_team');
+
+            // 1. Xem hồ sơ nhân viên cấp dưới 
+            Route::get('team/{id}', [LineManagerController::class, 'showTeamMember'])
+                ->name('team.show')
+                ->middleware('permission:employee_view_team');
+
+            // 2. Xem báo cáo chấm công của team
+            Route::get('attendance', [LineManagerController::class, 'teamAttendance'])
+                ->name('team.attendance')
+                ->middleware('permission:attendance_view_team');
+
+            // 3. Phê duyệt/Từ chối đơn xin nghỉ phép của lính
+            Route::get('leaves', [LineManagerController::class, 'indexLeaves'])
+                ->name('leaves.index')
+                ->middleware('permission:leave_request_approve');
+            Route::put('leaves/{id}/review', [LineManagerController::class, 'approveLeave'])
+                ->name('leaves.review')
+                ->middleware('permission:leave_request_approve');
+                
+            // 4. Phê duyệt/Từ chối đơn xin tăng ca (OT) của lính
+            Route::put('overtime/{id}/review', [LineManagerController::class, 'approveOvertime'])
+                ->name('overtime.review')
+                ->middleware('permission:attendance_approve_ot');
+        });
+
+        // ==========================================
+    // 5. NHÓM CHUYÊN VIÊN C&B (QUẢN LÝ LƯƠNG & PHÚC LỢI)
+    // ==========================================
+    Route::middleware(['role:CvB Specialist|HR Manager |Employee|Super Admin'])->group(function () {
+        
+        // 5.1 Quản lý thành phần lương (Thưởng, phụ cấp, khấu trừ)
+        Route::resource('salary-components', SalaryComponentController::class)
+            ->parameters(['salary-components' => 'salaryComponent'])
+            ->middleware('permission:salary_component_manage');
+
+        // 5.2 Quản lý Cơ cấu lương (Gán số tiền cho từng nhân sự)
+        Route::resource('salary-structures', EmployeeSalaryStructureController::class)
+            ->parameters(['salary-structures' => 'salaryStructure'])
+            ->middleware('permission:salary_structure_view|salary_structure_update');
+
+        // 5.3 Quản lý Đợt/Kỳ công tính lương chính
+        Route::resource('payroll-periods', PayrollPeriodController::class)
+            ->parameters(['payroll-periods' => 'payrollPeriod'])
+            ->middleware('permission:payroll_period_manage');
+
+        // Các Action xử lý lõi tính toán đặc thù của động cơ tính lương
+        Route::prefix('payroll-periods/{id}')->name('payroll-periods')->group(function () {
+            // Nút bấm chạy máy tính lương tự động
+            Route::post('/generate', [PayrollPeriodController::class, 'generatePayroll'])
+                ->name('generate')
+                ->middleware('permission:payroll_calculate');
+                
+            // Nút bấm chốt khóa/mở khóa kỳ lương
+            Route::put('/lock', [PayrollPeriodController::class, 'lockPeriod'])
+                ->name('lock')
+                ->middleware('permission:payroll_period_manage');
+                
+            // Nút bấm phân phối xuất bản gửi mail phiếu lương hàng loạt
+            Route::post('/bulk-send', [PayrollPeriodController::class, 'bulkSendPayslips'])
+                ->name('bulk-send')
+                ->middleware('permission:payslip_publish');
+        });
+
+        // 5.4 Xem và quản lý toàn bộ Phiếu lương (Bảng tổng hợp lương) của công ty
+        Route::resource('payslips', PayslipController::class)
+            ->parameters(['payslips' => 'payslip'])
+            ->middleware('permission:payslip_view_all');
+
+        // 👇 BỔ SUNG: TUYẾN ĐƯỜNG XEM PHIẾU LƯƠNG CÁ NHÂN CHO NHÂN VIÊN
+        Route::prefix('my-payslips')->name('my-payslips')->group(function () {
+            Route::get('/', [PayslipController::class, 'myPayslips'])->name('index'); // Trang danh sách lịch sử lương
+            Route::get('/{id}', [PayslipController::class, 'showMyPayslip'])->name('show'); // Trang xem chi tiết 1 phiếu lương
+        });
     });
 });
 

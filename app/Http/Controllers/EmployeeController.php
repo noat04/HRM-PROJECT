@@ -10,7 +10,7 @@ use Inertia\Inertia;
 use App\Models\Employee;
 use App\Models\Department;
 use App\Models\Position;
-use App\Models\User;
+use App\Models\User;    
 
 class EmployeeController extends Controller
 {

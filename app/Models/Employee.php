@@ -88,7 +88,9 @@ class Employee extends Model
 
     // --- C. QUAN HỆ CHẤM CÔNG & LƯƠNG (Sẽ mở rộng sau) ---
 
-    // public function attendances() { ... }
+    public function attendances() {
+        return $this->hasMany(Attendance::class);
+    }
     // public function payslips() { ... }
 
     
@@ -109,4 +111,13 @@ class Employee extends Model
         $name = urlencode($this->full_name);
         return "https://ui-avatars.com/api/?name={$name}&background=random&color=fff";
     }
+
+    // Hàm helper để kiểm tra xem nhân viên này có đang làm việc không
+    public function isActive()
+    {
+        // Nếu chưa có ngày nghỉ việc VÀ trạng thái là Active (Đang làm việc)
+        return !$this->resignation_date && $this->status === 'official';
+    }
+
+    
 }
